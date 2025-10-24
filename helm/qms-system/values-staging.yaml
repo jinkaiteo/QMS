@@ -1,0 +1,58 @@
+# Staging environment values
+environment: staging
+
+image:
+  repository: ghcr.io/jinkaiteo/qms
+  tag: "staging"
+  pullPolicy: Always
+
+replicaCount: 2
+
+ingress:
+  enabled: true
+  className: "nginx" 
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+  hosts:
+    - host: qms-staging.company.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: qms-staging-tls
+      hosts:
+        - qms-staging.company.com
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# Staging database configuration
+database:
+  host: postgres-staging-service
+  port: 5432
+  name: qms_staging
+  user: qms_staging_user
+
+# Staging Redis configuration
+redis:
+  host: redis-staging-service
+  port: 6379
+
+# Application configuration for staging
+app:
+  secretKey: "staging-secret-key"
+  debug: false
+  logLevel: "INFO"
+  
+# Health check configuration
+healthcheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 30
+  periodSeconds: 10
