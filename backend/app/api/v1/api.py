@@ -3,7 +3,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, users, system, documents, quality_events, capas
+from app.api.v1.endpoints import auth, users, system, documents, quality_events, capas, training, lims
 
 api_router = APIRouter()
 
@@ -16,3 +16,5 @@ api_router.include_router(documents.router, prefix="/documents", tags=["document
 # Phase 3: QRM endpoints
 api_router.include_router(quality_events.router, prefix="/quality-events", tags=["quality-events"])
 api_router.include_router(capas.router, prefix="/capas", tags=["capas"])
+api_router.include_router(training.router, prefix="/training", tags=["training"])
+api_router.include_router(lims.router, prefix="/lims", tags=["lims"])

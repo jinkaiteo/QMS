@@ -15,7 +15,7 @@ from app.models.edms import (
     DocumentWorkflow, WorkflowStep, DigitalSignature, DocumentComment
 )
 from app.models.user import User
-from app.core.logging import get_audit_logger
+from app.core.logging import get_logger
 from app.core.config import settings
 
 
@@ -24,7 +24,7 @@ class DocumentService:
     
     def __init__(self, db: Session):
         self.db = db
-        self.audit_logger = get_audit_logger()
+        self.audit_logger = get_logger()
         self.storage_path = Path(settings.DOCUMENT_STORAGE_PATH)
         self.storage_path.mkdir(parents=True, exist_ok=True)
     

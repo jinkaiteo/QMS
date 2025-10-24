@@ -8,7 +8,7 @@ from datetime import datetime, date, timedelta
 
 from app.models.qrm import CAPA, CAPAAction, QualityEvent
 from app.models.user import User
-from app.core.logging import get_audit_logger
+from app.core.logging import get_logger
 
 
 class CAPAService:
@@ -16,7 +16,7 @@ class CAPAService:
     
     def __init__(self, db: Session):
         self.db = db
-        self.audit_logger = get_audit_logger()
+        self.audit_logger = get_logger()
     
     def create_capa(
         self,

@@ -1,0 +1,317 @@
+# QMS Platform v3.0 - Production Docker Compose Configuration
+# Optimized for pharmaceutical production environments
+
+version: '3.8'
+
+networks:
+  qms-production:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_production_data:
+    driver: local
+  redis_production_data:
+    driver: local
+  minio_production_data:
+    driver: local
+  qms_production_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+services:
+  # PostgreSQL Database - Production Configuration
+  qms-db-production:
+    image: postgres:16
+    container_name: qms-db-production
+    restart: always
+    networks:
+      - qms-production
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: qms_production
+      POSTGRES_USER: qms_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_production_data:/var/lib/postgresql/data
+      - ./config/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ../database/init:/docker-entrypoint-initdb.d:ro
+      - ./logs/postgres:/var/log/postgresql
+      - ./backups:/backups
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+      -c log_destination=stderr
+      -c logging_collector=on
+      -c log_directory=/var/log/postgresql
+      -c log_filename=postgresql-%Y-%m-%d.log
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qms_user -d qms_production"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # Redis Cache - Production Configuration
+  qms-redis-production:
+    image: redis:7-alpine
+    container_name: qms-redis-production
+    restart: always
+    networks:
+      - qms-production
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_production_data:/data
+      - ./config/redis.conf:/etc/redis/redis.conf
+      - ./logs/redis:/var/log/redis
+    command: redis-server /etc/redis/redis.conf --requirepass ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # MinIO Object Storage - Production Configuration
+  qms-minio-production:
+    image: minio/minio:latest
+    container_name: qms-minio-production
+    restart: always
+    networks:
+      - qms-production
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_PROMETHEUS_AUTH_TYPE: "public"
+    volumes:
+      - minio_production_data:/data
+      - ./logs/minio:/var/log/minio
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+
+  # QMS Application - Production Configuration
+  qms-app-production:
+    build:
+      context: ../..
+      dockerfile: deployment/Dockerfile.prod
+    container_name: qms-app-production
+    restart: always
+    networks:
+      - qms-production
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: production
+      POSTGRES_SERVER: qms-db-production
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: qms_production
+      POSTGRES_USER: qms_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@qms-redis-production:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      MINIO_ENDPOINT: qms-minio-production:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      DOCUMENT_STORAGE_PATH: /app/storage/documents
+      LOG_LEVEL: INFO
+      MAX_WORKERS: 4
+    volumes:
+      - qms_production_logs:/app/logs
+      - ./data/storage:/app/storage
+      - ./config:/app/config:ro
+    depends_on:
+      qms-db-production:
+        condition: service_healthy
+      qms-redis-production:
+        condition: service_healthy
+      qms-minio-production:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+
+  # Nginx Reverse Proxy - Production Configuration
+  qms-nginx-production:
+    image: nginx:alpine
+    container_name: qms-nginx-production
+    restart: always
+    networks:
+      - qms-production
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - qms-app-production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  # Monitoring - Prometheus
+  qms-prometheus:
+    image: prom/prometheus:latest
+    container_name: qms-prometheus
+    restart: always
+    networks:
+      - qms-production
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=90d'
+      - '--web.enable-lifecycle'
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # Monitoring - Grafana
+  qms-grafana:
+    image: grafana/grafana:latest
+    container_name: qms-grafana
+    restart: always
+    networks:
+      - qms-production
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: false
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    volumes:
+      - ./monitoring/grafana:/var/lib/grafana
+    depends_on:
+      - qms-prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # Backup Service
+  qms-backup:
+    image: alpine:latest
+    container_name: qms-backup
+    restart: "no"
+    networks:
+      - qms-production
+    volumes:
+      - ./backups:/backups
+      - ./scripts:/scripts:ro
+      - postgres_production_data:/postgres_data:ro
+      - ./data:/app_data:ro
+    command: /scripts/backup_production.sh
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+
+# Prometheus Monitoring
+qms-prometheus:
+  image: prom/prometheus:latest
+  container_name: qms-prometheus
+  restart: unless-stopped
+  command:
+    - '--config.file=/etc/prometheus/prometheus.yml'
+    - '--storage.tsdb.path=/prometheus'
+    - '--web.console.libraries=/etc/prometheus/console_libraries'
+    - '--web.console.templates=/etc/prometheus/consoles'
+    - '--storage.tsdb.retention.time=200h'
+    - '--web.enable-lifecycle'
+  volumes:
+    - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    - prometheus_data:/prometheus
+  networks:
+    - qms-production
+  ports:
+    - "9090:9090"
+  healthcheck:
+    test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+
+# Grafana Dashboard
+qms-grafana:
+  image: grafana/grafana:latest
+  container_name: qms-grafana
+  restart: unless-stopped
+  environment:
+    - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
+    - GF_USERS_ALLOW_SIGN_UP=false
+  volumes:
+    - grafana_data:/var/lib/grafana
+  networks:
+    - qms-production
+  ports:
+    - "3000:3000"
+  depends_on:
+    - qms-prometheus
+  healthcheck:
+    test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 3

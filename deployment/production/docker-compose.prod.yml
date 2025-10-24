@@ -9,8 +9,6 @@ volumes:
   redis_prod_data:
   minio_prod_data:
   qms_logs:
-  prometheus_prod_data:
-  grafana_prod_data:
 
 services:
   # PostgreSQL Database
@@ -133,40 +131,3 @@ services:
       - "8443:443"
     depends_on:
       - qms-app-prod
-
-  # Prometheus Monitoring
-  qms-prometheus-prod:
-    image: prom/prometheus:latest
-    container_name: qms-prometheus-prod
-    restart: unless-stopped
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-    volumes:
-      - ./production/config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_prod_data:/prometheus
-    networks:
-      - qms-prod
-    ports:
-      - "9090:9090"
-
-  # Grafana Dashboard
-  qms-grafana-prod:
-    image: grafana/grafana:latest
-    container_name: qms-grafana-prod
-    restart: unless-stopped
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
-      - GF_USERS_ALLOW_SIGN_UP=false
-    volumes:
-      - grafana_prod_data:/var/lib/grafana
-    networks:
-      - qms-prod
-    ports:
-      - "3000:3000"
-    depends_on:
-      - qms-prometheus-prod

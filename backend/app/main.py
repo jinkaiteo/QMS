@@ -13,12 +13,12 @@ from app.core.config import settings
 from app.core.database import engine, SessionLocal
 from app.core.security import SecurityMiddleware
 from app.api.v1.api import api_router
-from app.core.logging import setup_logging
+from app.core.logging import configure_logging
 from app.services.audit_service import AuditService
 
 
 # Setup logging
-setup_logging()
+configure_logging()
 logger = logging.getLogger(__name__)
 
 

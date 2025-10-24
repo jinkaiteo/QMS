@@ -69,7 +69,16 @@ class Settings(BaseSettings):
         raise ValueError(v)
     
     # Trusted hosts for production
-    ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1"]
+    ALLOWED_HOSTS: List[str] = [
+        "localhost", 
+        "127.0.0.1", 
+        "qms-platform.local",
+        "localhost:8443",
+        "127.0.0.1:8443",
+        "qms-platform.local:8443",
+        "qms-app-prod",
+        "qms-app-prod:8000"
+    ]
     
     # File Storage
     UPLOAD_PATH: str = "/app/uploads"

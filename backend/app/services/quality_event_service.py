@@ -8,8 +8,8 @@ from datetime import datetime, date
 
 from app.models.qrm import QualityEvent, QualityEventType, QualityInvestigation
 from app.models.user import User
-from app.models.base import Department
-from app.core.logging import get_audit_logger
+from app.models.user import Department
+from app.core.logging import get_logger
 from app.core.config import settings
 
 
@@ -18,7 +18,7 @@ class QualityEventService:
     
     def __init__(self, db: Session):
         self.db = db
-        self.audit_logger = get_audit_logger()
+        self.audit_logger = get_logger()
     
     def create_quality_event(
         self,
