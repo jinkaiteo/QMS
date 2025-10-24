@@ -225,6 +225,10 @@ jobs:
         export DATABASE_URL=postgresql://postgres:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
         export REDIS_URL=redis://localhost:6379/0
         export SECRET_KEY=test-secret-key
+        export POSTGRES_SERVER=localhost
+        export POSTGRES_USER=postgres
+        export POSTGRES_PASSWORD=${{ env.POSTGRES_PASSWORD }}
+        export POSTGRES_DB=${{ env.POSTGRES_DB }}
         
         # Initialize database
         python -c "
@@ -348,6 +352,10 @@ jobs:
         export DATABASE_URL=postgresql://postgres:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
         export REDIS_URL=redis://localhost:6379/0
         export SECRET_KEY=test-secret-key
+        export POSTGRES_SERVER=localhost
+        export POSTGRES_USER=postgres
+        export POSTGRES_PASSWORD=${{ env.POSTGRES_PASSWORD }}
+        export POSTGRES_DB=${{ env.POSTGRES_DB }}
         
         # Initialize database
         python -c "

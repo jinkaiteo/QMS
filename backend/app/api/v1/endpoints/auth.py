@@ -15,10 +15,7 @@ security = HTTPBearer()
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(
-    login_request: LoginRequest,
-    db: Session = Depends(get_db)
-):
+async def login(login_request: LoginRequest, db: Session = Depends(get_db)):
     """
     User login endpoint
     Authenticates user and returns JWT tokens
