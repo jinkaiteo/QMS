@@ -14,25 +14,19 @@ router = APIRouter()
 @router.get("/health")
 async def health_check():
     """Comprehensive system health check"""
-    
+
     # Database health check
     db_health = db_manager.health_check()
-    
+
     # Application health
     health_status = {
         "status": "healthy" if db_health["status"] == "healthy" else "unhealthy",
         "timestamp": "2024-01-01T00:00:00Z",  # TODO: Use actual timestamp
         "version": settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
-        "components": {
-            "database": db_health,
-            "application": {
-                "status": "healthy",
-                "version": settings.APP_VERSION
-            }
-        }
+        "components": {"database": db_health, "application": {"status": "healthy", "version": settings.APP_VERSION}},
     }
-    
+
     return health_status
 
 
@@ -46,12 +40,12 @@ async def system_info():
         "compliance": "21 CFR Part 11",
         "features": [
             "Electronic Document Management",
-            "Quality Record Management", 
+            "Quality Record Management",
             "Training Record Management",
             "Laboratory Information Management",
             "Digital Signatures",
-            "Audit Trail"
-        ]
+            "Audit Trail",
+        ],
     }
 
 
