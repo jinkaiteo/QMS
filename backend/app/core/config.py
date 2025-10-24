@@ -210,6 +210,10 @@ settings = get_settings()
 # Ensure upload directory exists
 def ensure_directories():
     """Ensure required directories exist"""
+    # Skip directory creation in testing environment or when permissions are insufficient
+    if os.getenv("ENVIRONMENT") == "testing":
+        return
+        
     directories = [
         settings.UPLOAD_PATH,
         settings.BACKUP_PATH,
@@ -218,7 +222,11 @@ def ensure_directories():
     ]
     
     for directory in directories:
-        Path(directory).mkdir(parents=True, exist_ok=True)
+        try:
+            Path(directory).mkdir(parents=True, exist_ok=True)
+        except (PermissionError, OSError):
+            # Skip directory creation if permissions are insufficient or in CI environment
+            pass
 
 
 # Call on import
