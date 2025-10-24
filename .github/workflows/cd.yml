@@ -79,7 +79,7 @@ jobs:
         output-file: sbom.spdx.json
         
     - name: Upload SBOM
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: sbom
         path: sbom.spdx.json
@@ -201,7 +201,7 @@ jobs:
         pytest tests/e2e/ -v --tb=short --html=e2e-report.html
         
     - name: Upload test report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: e2e-test-report
@@ -217,7 +217,7 @@ jobs:
           --html staging-performance.html --headless
           
     - name: Upload performance report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: staging-performance-report
         path: backend/staging-performance.html
@@ -340,7 +340,7 @@ jobs:
         EOF
         
     - name: Upload deployment report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: deployment-report
         path: deployment-report.md
