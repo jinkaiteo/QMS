@@ -1,0 +1,128 @@
+version: '3.8'
+
+networks:
+  qms-prod:
+    driver: bridge
+
+volumes:
+  postgres_prod_data:
+  redis_prod_data:
+  minio_prod_data:
+  qms_logs:
+
+services:
+  # PostgreSQL Database
+  qms-db-prod:
+    image: postgres:18
+    container_name: qms-db-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: qms_prod
+      POSTGRES_USER: qms_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      - ../database/init:/docker-entrypoint-initdb.d:ro
+      - ./backups:/backups
+    networks:
+      - qms-prod
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qms_user -d qms_prod"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache
+  qms-redis-prod:
+    image: redis:7-alpine
+    container_name: qms-redis-prod
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_prod_data:/data
+    networks:
+      - qms-prod
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--pass", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MinIO Object Storage
+  qms-minio-prod:
+    image: minio/minio:latest
+    container_name: qms-minio-prod
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_prod_data:/data
+    networks:
+      - qms-prod
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+
+  # QMS Application
+  qms-app-prod:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.prod
+    container_name: qms-app-prod
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql://qms_user:${POSTGRES_PASSWORD}@qms-db-prod:5432/qms_prod
+      REDIS_URL: redis://:${REDIS_PASSWORD}@qms-redis-prod:6379
+      SECRET_KEY: ${SECRET_KEY}
+      MINIO_ENDPOINT: qms-minio-prod:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      DOCUMENT_STORAGE_PATH: /app/storage/documents
+    volumes:
+      - qms_logs:/app/logs
+      - ./storage:/app/storage
+    networks:
+      - qms-prod
+    ports:
+      - "8000:8000"
+    depends_on:
+      qms-db-prod:
+        condition: service_healthy
+      qms-redis-prod:
+        condition: service_healthy
+      qms-minio-prod:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Reverse Proxy
+  qms-nginx-prod:
+    image: nginx:alpine
+    container_name: qms-nginx-prod
+    restart: unless-stopped
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - qms-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - qms-app-prod
