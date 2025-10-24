@@ -6,12 +6,18 @@ from app.models.user import User, Role, UserRole, Organization, Department
 from app.models.audit import AuditLog
 from app.models.system import SystemSetting
 
-# Phase 2: EDMS Models - Temporarily disabled for testing
-# from app.models.edms import (
-#     DocumentType, DocumentCategory, Document, DocumentVersion,
-#     DocumentWorkflow, WorkflowStep, DigitalSignature,
-#     DocumentRelationship, DocumentPermission, DocumentComment
-# )
+# Phase 2: EDMS Models
+from app.models.edms import (
+    DocumentType, DocumentCategory, Document, DocumentVersion,
+    DocumentWorkflow, WorkflowStep, DigitalSignature,
+    DocumentRelationship, DocumentPermission, DocumentComment
+)
+
+# Phase 3: QRM Models
+from app.models.qrm import (
+    QualityEventType, QualityEvent, QualityInvestigation,
+    CAPA, CAPAAction, ChangeControlRequest, RiskAssessment
+)
 
 __all__ = [
     "BaseModel",
@@ -32,5 +38,13 @@ __all__ = [
     "DigitalSignature",
     "DocumentRelationship",
     "DocumentPermission",
-    "DocumentComment"
+    "DocumentComment",
+    # QRM Models
+    "QualityEventType",
+    "QualityEvent",
+    "QualityInvestigation",
+    "CAPA",
+    "CAPAAction",
+    "ChangeControlRequest",
+    "RiskAssessment"
 ]

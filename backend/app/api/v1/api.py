@@ -3,7 +3,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, users, system, documents
+from app.api.v1.endpoints import auth, users, system, documents, quality_events, capas
 
 api_router = APIRouter()
 
@@ -13,3 +13,6 @@ api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(system.router, prefix="/system", tags=["system"])
 # Phase 2: EDMS endpoints
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
+# Phase 3: QRM endpoints
+api_router.include_router(quality_events.router, prefix="/quality-events", tags=["quality-events"])
+api_router.include_router(capas.router, prefix="/capas", tags=["capas"])
