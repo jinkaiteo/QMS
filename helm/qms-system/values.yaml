@@ -77,3 +77,10 @@ app:
   secretKey: "change-in-production"
   debug: true
   logLevel: "INFO"
+
+# Health check configuration
+healthcheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 30
+  periodSeconds: 10
