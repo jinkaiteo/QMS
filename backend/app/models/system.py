@@ -73,7 +73,7 @@ class ApplicationMetadata(BaseModel):
     environment = Column(String(50), comment="Deployment environment")
     
     # Metadata
-    metadata = Column(JSONB, comment="Additional component metadata")
+    app_metadata = Column(JSONB, comment="Additional component metadata")
     
     def __repr__(self):
         return f"<ApplicationMetadata(component={self.component}, version={self.version})>"

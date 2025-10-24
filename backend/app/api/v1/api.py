@@ -3,7 +3,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, users, system
+from app.api.v1.endpoints import auth, users, system, documents
 
 api_router = APIRouter()
 
@@ -11,3 +11,5 @@ api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["authentication"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(system.router, prefix="/system", tags=["system"])
+# Phase 2: EDMS endpoints
+api_router.include_router(documents.router, prefix="/documents", tags=["documents"])

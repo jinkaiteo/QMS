@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Any, Union, Optional, Dict, List
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import HTTPException, status, Request, Response
+from fastapi import HTTPException, status, Request, Response, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import secrets
 import hashlib
@@ -28,13 +28,32 @@ class SecurityUtils:
     
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
-        """Verify password against hash"""
-        return pwd_context.verify(plain_password, hashed_password)
+        """Verify password against hash using direct bcrypt"""
+        import bcrypt
+        try:
+            # Ensure password is bytes and within bcrypt limit
+            password_bytes = plain_password.encode('utf-8')[:72]
+            hash_bytes = hashed_password.encode('utf-8')
+            return bcrypt.checkpw(password_bytes, hash_bytes)
+        except Exception as e:
+            logger.error(f"Password verification error: {e}")
+            return False
     
     @staticmethod
     def get_password_hash(password: str) -> str:
-        """Generate password hash"""
-        return pwd_context.hash(password)
+        """Generate password hash using direct bcrypt"""
+        import bcrypt
+        try:
+            # Ensure password is bytes and within bcrypt limit
+            password_bytes = password.encode('utf-8')[:72]
+            salt = bcrypt.gensalt()
+            hash_bytes = bcrypt.hashpw(password_bytes, salt)
+            return hash_bytes.decode('utf-8')
+        except Exception as e:
+            logger.error(f"Password hashing error: {e}")
+            # Fallback to simpler hash if bcrypt fails
+            import hashlib
+            return hashlib.sha256(password.encode()).hexdigest()
     
     @staticmethod
     def validate_password_complexity(password: str) -> Dict[str, Any]:
@@ -307,6 +326,56 @@ class AuditLogger:
             logger.info("Authorization granted", extra=audit_data)
         else:
             logger.warning("Authorization denied", extra=audit_data)
+
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Get current authenticated user from JWT token
+    This function is used as a dependency in FastAPI endpoints
+    """
+    from app.core.database import get_db
+    from app.models.user import User
+    
+    # Extract token
+    token = credentials.credentials
+    
+    # Verify token
+    payload = token_manager.verify_token(token, "access")
+    if not payload:
+        raise AuthenticationException("Invalid or expired token")
+    
+    # Extract user ID from token
+    user_id = payload.get("sub")
+    if not user_id:
+        raise AuthenticationException("Invalid token payload")
+    
+    # Get database session
+    db = next(get_db())
+    
+    try:
+        # Get user from database
+        user = db.query(User).filter(
+            User.id == int(user_id),
+            User.is_deleted == False
+        ).first()
+        
+        if not user:
+            raise AuthenticationException("User not found")
+        
+        if user.status != "active":
+            raise AuthenticationException("User account is not active")
+        
+        return user
+        
+    finally:
+        db.close()
+
+
+async def get_current_active_user(current_user = Depends(get_current_user)):
+    """
+    Get current active user (convenience function)
+    """
+    return current_user
 
 
 # Global instances

@@ -12,7 +12,7 @@ CREATE EXTENSION IF NOT EXISTS "unaccent";         -- Remove accents for search
 CREATE TYPE user_status AS ENUM ('active', 'inactive', 'locked', 'pending');
 CREATE TYPE document_status AS ENUM ('draft', 'pending_review', 'reviewed', 'pending_approval', 'approved', 'rejected', 'obsolete', 'superseded');
 CREATE TYPE workflow_state AS ENUM ('pending', 'in_progress', 'completed', 'cancelled', 'rejected');
-CREATE TYPE audit_action AS ENUM ('CREATE', 'READ', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'APPROVE', 'REJECT');
+CREATE TYPE audit_action AS ENUM ('CREATE', 'READ', 'UPDATE', 'DELETE', 'INSERT', 'LOGIN', 'LOGOUT', 'APPROVE', 'REJECT');
 CREATE TYPE signature_type AS ENUM ('author', 'reviewer', 'approver', 'witness');
 
 -- Set default timezone to UTC for compliance

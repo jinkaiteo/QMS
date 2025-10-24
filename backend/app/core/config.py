@@ -36,14 +36,18 @@ class Settings(BaseSettings):
     def assemble_db_connection(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
         if isinstance(v, str):
             return v
-        return PostgresDsn.build(
-            scheme="postgresql",
-            user=values.get("POSTGRES_USER"),
-            password=values.get("POSTGRES_PASSWORD"),
-            host=values.get("POSTGRES_SERVER"),
-            port=values.get("POSTGRES_PORT"),
-            path=f"/{values.get('POSTGRES_DB') or ''}",
-        )
+        
+        # Build PostgreSQL URL manually for Pydantic v2 compatibility
+        user = values.get("POSTGRES_USER", "")
+        password = values.get("POSTGRES_PASSWORD", "")
+        host = values.get("POSTGRES_SERVER", "localhost")
+        port = values.get("POSTGRES_PORT", "5432")
+        db = values.get("POSTGRES_DB", "")
+        
+        if user and password:
+            return f"postgresql://{user}:{password}@{host}:{port}/{db}"
+        else:
+            return f"postgresql://{host}:{port}/{db}"
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -80,6 +84,14 @@ class Settings(BaseSettings):
     MINIO_ACCESS_KEY: str = "minioadmin"
     MINIO_SECRET_KEY: str = "minioadmin123"
     MINIO_BUCKET_NAME: str = "qms-documents"
+    
+    # Document storage settings (Phase 2)
+    DOCUMENT_STORAGE_PATH: str = "/app/storage/documents"
+    MAX_DOCUMENT_SIZE_MB: int = 100
+    ALLOWED_DOCUMENT_EXTENSIONS: list = [
+        ".pdf", ".docx", ".doc", ".xlsx", ".xls", 
+        ".pptx", ".ppt", ".txt", ".rtf"
+    ]
     MINIO_SECURE: bool = False
     
     # Elasticsearch

@@ -158,3 +158,4 @@ yarn-error.log*
 *.bak
 *.backup
 *.sqlscripts/qms_secrets_config.json
+backend/qms_env/

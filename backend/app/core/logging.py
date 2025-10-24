@@ -17,8 +17,17 @@ def setup_logging():
     """Setup structured logging for QMS application"""
     
     # Ensure log directory exists
-    log_dir = Path("/app/logs")
-    log_dir.mkdir(exist_ok=True)
+    import os
+    if os.getenv("ENVIRONMENT", "development") == "development":
+        log_dir = Path("logs")  # Use local logs directory for development
+    else:
+        log_dir = Path("/app/logs")
+    
+    try:
+        log_dir.mkdir(exist_ok=True, parents=True)
+    except (PermissionError, OSError):
+        # Fallback to current directory if permission denied
+        log_dir = Path(".")
     
     # Configure structlog
     structlog.configure(
@@ -63,7 +72,7 @@ def setup_logging():
                 "class": "logging.handlers.RotatingFileHandler",
                 "level": settings.LOG_LEVEL,
                 "formatter": "json",
-                "filename": "/app/logs/qms.log",
+                "filename": "logs/qms.log",
                 "maxBytes": 10485760,  # 10MB
                 "backupCount": 5
             },
@@ -71,7 +80,7 @@ def setup_logging():
                 "class": "logging.handlers.RotatingFileHandler",
                 "level": "INFO",
                 "formatter": "json",
-                "filename": "/app/logs/audit.log",
+                "filename": "logs/audit.log",
                 "maxBytes": 10485760,  # 10MB
                 "backupCount": 10  # Keep more audit logs
             },
@@ -79,7 +88,7 @@ def setup_logging():
                 "class": "logging.handlers.RotatingFileHandler",
                 "level": "INFO",
                 "formatter": "json",
-                "filename": "/app/logs/security.log",
+                "filename": "logs/security.log",
                 "maxBytes": 10485760,  # 10MB
                 "backupCount": 10
             }
@@ -307,3 +316,8 @@ class AuditLogFormatter(logging.Formatter):
 def get_logger(name: str) -> logging.Logger:
     """Get a logger instance with proper configuration"""
     return logging.getLogger(name)
+
+
+def get_audit_logger():
+    """Get the global audit logger instance"""
+    return AuditLogger()

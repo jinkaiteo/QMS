@@ -1,0 +1,112 @@
+# QMS Development Environment - Podman Compatible
+# Phase 1: Foundation Infrastructure Setup
+version: '3.8'
+
+networks:
+  qms-dev:
+    driver: bridge
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+  minio_dev_data:
+
+services:
+  # PostgreSQL Database
+  qms-db-dev:
+    image: docker.io/library/postgres:18
+    container_name: qms-db-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: qms_dev
+      POSTGRES_USER: qms_user
+      POSTGRES_PASSWORD: qms_dev_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql
+      - ./database/init:/docker-entrypoint-initdb.d:Z
+    networks:
+      - qms-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qms_user -d qms_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache & Session Store
+  qms-redis-dev:
+    image: docker.io/library/redis:7-alpine
+    container_name: qms-redis-dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass redis_dev_password
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - qms-dev
+    healthcheck:
+      test: ["CMD", "redis-cli", "--pass", "redis_dev_password", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO Object Storage
+  qms-minio-dev:
+    image: docker.io/minio/minio:latest
+    container_name: qms-minio-dev
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_dev_data:/data
+    networks:
+      - qms-dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Elasticsearch for search
+  qms-elasticsearch-dev:
+    image: docker.io/library/elasticsearch:8.11.0
+    container_name: qms-elasticsearch-dev
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - xpack.security.enabled=false
+      - cluster.routing.allocation.disk.threshold_enabled=false
+    ports:
+      - "9200:9200"
+    networks:
+      - qms-dev
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # pgAdmin for database management
+  qms-pgadmin-dev:
+    image: docker.io/dpage/pgadmin4:latest
+    container_name: qms-pgadmin-dev
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@qms.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    networks:
+      - qms-dev
+    depends_on:
+      - qms-db-dev

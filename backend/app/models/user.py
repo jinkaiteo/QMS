@@ -109,13 +109,19 @@ class User(BaseModel):
     manager = relationship("User", remote_side="User.id")
     
     # Role assignments
-    user_roles = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
+    user_roles = relationship("UserRole", foreign_keys="[UserRole.user_id]", back_populates="user", cascade="all, delete-orphan")
     
     # Sessions
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
     
     # Password history
     password_history = relationship("PasswordHistory", back_populates="user", cascade="all, delete-orphan")
+    
+    # EDMS relationships (Phase 2)
+    authored_documents = relationship("Document", foreign_keys="Document.author_id", back_populates="author")
+    owned_documents = relationship("Document", foreign_keys="Document.owner_id", back_populates="owner")
+    digital_signatures = relationship("DigitalSignature", back_populates="signer")
+    document_comments = relationship("DocumentComment", back_populates="user")
     
     @property
     def full_name(self):
@@ -178,7 +184,7 @@ class Role(BaseModel):
     is_active = Column(Boolean, default=True, nullable=False)
     
     # Relationships
-    user_roles = relationship("UserRole", back_populates="role", cascade="all, delete-orphan")
+    user_roles = relationship("UserRole", foreign_keys="[UserRole.role_id]", back_populates="role", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Role(name={self.name}, module={self.module})>"
