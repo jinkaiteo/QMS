@@ -49,7 +49,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ${{ env.REGISTRY }}/${{ github.repository }}
+        images: ${{ env.REGISTRY }}/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
         tags: |
           type=ref,event=branch
           type=ref,event=pr
@@ -153,7 +153,7 @@ jobs:
         # Simulate Helm dry-run to validate templates
         helm template qms-staging ./helm/qms-system \
           --namespace qms-staging \
-          --set image.repository=${{ env.REGISTRY }}/${{ github.repository }} \
+          --set image.repository=${{ env.REGISTRY }}/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]') \
           --set image.tag=${{ github.sha }} \
           --set environment=staging \
           --set ingress.hosts[0].host=qms-staging.company.com \
@@ -166,7 +166,7 @@ jobs:
         cat staging-deployment.yaml | head -50
         
         echo "🎯 Staging deployment simulation completed successfully!"
-        echo "📍 Image: ${{ env.REGISTRY }}/${{ github.repository }}:${{ github.sha }}"
+        echo "📍 Image: ${{ env.REGISTRY }}/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]'):${{ github.sha }}"
         echo "🌐 Target Host: qms-staging.company.com"
           
     - name: Run staging smoke tests
@@ -175,7 +175,7 @@ jobs:
         
         # Validate that the Docker image was built and pushed successfully
         echo "✅ Validating container image availability..."
-        docker pull ${{ env.REGISTRY }}/${{ github.repository }}:${{ github.sha }} || exit 1
+        docker pull ${{ env.REGISTRY }}/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]'):${{ github.sha }} || exit 1
         echo "✅ Container image successfully pulled"
         
         # Validate deployment configuration
@@ -199,7 +199,7 @@ jobs:
       run: |
         echo "✅ Successfully completed staging deployment simulation"
         echo "🌐 Target URL: https://qms-staging.company.com"
-        echo "📍 Container Image: ${{ env.REGISTRY }}/${{ github.repository }}:${{ github.sha }}"
+        echo "📍 Container Image: ${{ env.REGISTRY }}/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]'):${{ github.sha }}"
         echo "🎯 Environment: staging"
         echo "📊 Deployment Status: Validated and Ready for Real Cluster"
 
