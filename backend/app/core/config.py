@@ -2,7 +2,8 @@
 # Phase 1: Application settings and environment configuration
 
 from typing import List, Optional, Any, Dict
-from pydantic import BaseSettings, AnyHttpUrl, validator, PostgresDsn
+from pydantic import AnyHttpUrl, validator, PostgresDsn
+from pydantic_settings import BaseSettings
 import os
 from pathlib import Path
 
