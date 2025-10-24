@@ -103,7 +103,7 @@ jobs:
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: ${{ needs.build-and-push.outputs.image-tag }}
+        image-ref: ${{ env.REGISTRY }}/${{ env.REPO_LOWER }}:${{ github.sha }}
         format: 'sarif'
         output: 'trivy-results.sarif'
         
@@ -117,9 +117,10 @@ jobs:
       env:
         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
       with:
-        image: ${{ needs.build-and-push.outputs.image-tag }}
+        image: ${{ env.REGISTRY }}/${{ env.REPO_LOWER }}:${{ github.sha }}
         args: --severity-threshold=high
       continue-on-error: true
+      if: ${{ secrets.SNYK_TOKEN != '' }}
 
   # Deploy to Staging
   deploy-staging:
