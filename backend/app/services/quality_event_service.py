@@ -309,7 +309,40 @@ class QualityEventService:
         if quality_event.investigator_id == user_id:
             return True
         
-        # TODO: Implement more sophisticated permission checking
-        # based on roles, department access, etc.
+        # Sophisticated permission checking based on roles and hierarchy
+        
+        # Global quality event access (Quality Managers, QA Directors)
+        if self.current_user.has_permission("quality_event.read_all", "qrm"):
+            return True
+            
+        # Department-level access (Department Managers and Quality Coordinators)
+        if (self.current_user.has_permission("quality_event.read_department", "qrm") and
+            quality_event.reported_by_user and 
+            quality_event.reported_by_user.department_id == self.current_user.department_id):
+            return True
+            
+        # Organization-level access (Quality Directors, Compliance Officers)
+        if (self.current_user.has_permission("quality_event.read_organization", "qrm") and
+            quality_event.reported_by_user and
+            quality_event.reported_by_user.organization_id == self.current_user.organization_id):
+            return True
+            
+        # Event reporter always has access to their own events
+        if quality_event.reported_by == user_id:
+            return True
+            
+        # Assigned investigator has access
+        if quality_event.assigned_to == user_id:
+            return True
+            
+        # Users involved in the event (if tracked) have access
+        if (hasattr(quality_event, 'involved_users') and 
+            user_id in [u.id for u in quality_event.involved_users]):
+            return True
+            
+        # Management override for critical events
+        if (self.current_user.has_permission("management.view_critical", "core") and
+            quality_event.severity in ["high", "critical"]):
+            return True
         
         return False

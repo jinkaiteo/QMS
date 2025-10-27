@@ -1,7 +1,7 @@
 # QMS Database Configuration
 # Phase 1: SQLAlchemy database setup with connection pooling
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
@@ -32,6 +32,7 @@ Base = declarative_base()
 def set_search_path(dbapi_connection, connection_record):
     """Set the search path for the connection"""
     with dbapi_connection.cursor() as cursor:
+        # This is a raw psycopg2 cursor, not SQLAlchemy, so text() is not needed
         cursor.execute("SET search_path TO public")
 
 
@@ -64,9 +65,9 @@ def get_db_context(user_id: int = None, ip_address: str = None) -> Generator[Ses
     try:
         # Set application context for audit triggers
         if user_id:
-            db.execute(f"SET LOCAL app.current_user_id = '{user_id}'")
+            db.execute(text(f"SET LOCAL app.current_user_id = '{user_id}'"))
         if ip_address:
-            db.execute(f"SET LOCAL app.client_ip = '{ip_address}'")
+            db.execute(text(f"SET LOCAL app.client_ip = '{ip_address}'"))
         
         yield db
         db.commit()
@@ -92,7 +93,7 @@ def test_connection():
     """Test database connection"""
     try:
         db = SessionLocal()
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db.close()
         logger.info("Database connection test successful")
         return True
@@ -122,16 +123,16 @@ class DatabaseManager:
             db = SessionLocal()
             
             # Test basic connection
-            result = db.execute("SELECT 1 as test").fetchone()
+            result = db.execute(text("SELECT 1 as test")).fetchone()
             
             # Test audit table (critical for compliance)
-            audit_count = db.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0]
+            audit_count = db.execute(text("SELECT COUNT(*) FROM audit_logs")).fetchone()[0]
             
             # Test write capability
-            db.execute("""
+            db.execute(text("""
                 INSERT INTO audit_logs (user_id, username, action, table_name, record_id, reason, is_system_action)
                 VALUES (1, 'system', 'CREATE', 'health_check', 'test', 'Health check test', true)
-            """)
+            """))
             db.commit()
             
             db.close()

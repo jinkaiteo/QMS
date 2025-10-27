@@ -1,7 +1,7 @@
 # QMS User Models
 # Phase 1: User management models for authentication and authorization
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Date
 from sqlalchemy.dialects.postgresql import JSONB, ENUM
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -10,7 +10,7 @@ import enum
 from app.models.base import BaseModel
 
 
-class UserStatus(enum.Enum):
+class UserStatus(str, enum.Enum):
     """User status enumeration"""
     ACTIVE = "active"
     INACTIVE = "inactive"
@@ -18,8 +18,8 @@ class UserStatus(enum.Enum):
     PENDING = "pending"
 
 
-# Create PostgreSQL ENUM type
-user_status_enum = ENUM(UserStatus, name="user_status", create_type=False)
+# Create PostgreSQL ENUM type that matches database values
+user_status_enum = ENUM('active', 'inactive', 'locked', 'pending', name="user_status", create_type=False)
 
 
 class Organization(BaseModel):
@@ -123,6 +123,9 @@ class User(BaseModel):
     digital_signatures = relationship("DigitalSignature", back_populates="signer")
     document_comments = relationship("DocumentComment", back_populates="user")
     
+    # Note: QRM and Training relationships will be added after all models are properly imported
+    # This avoids forward reference issues in SQLAlchemy
+    
     @property
     def full_name(self):
         """Get user's full name"""
@@ -176,6 +179,9 @@ class Role(BaseModel):
     
     __tablename__ = "roles"
     
+    # Override BaseModel field that doesn't exist in database
+    is_deleted = None
+    
     name = Column(String(100), unique=True, nullable=False, comment="Role name")
     display_name = Column(String(255), nullable=False, comment="Human-readable role name")
     description = Column(Text, comment="Role description")
@@ -195,6 +201,14 @@ class UserRole(BaseModel):
     
     __tablename__ = "user_roles"
     
+    # Override BaseModel fields that don't exist in the actual database table
+    uuid = None
+    created_at = None
+    updated_at = None
+    version = None
+    is_deleted = None
+    
+    # The actual database has 'id' as primary key, not composite key
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
     assigned_by = Column(Integer, ForeignKey("users.id"), comment="User who assigned the role")

@@ -151,7 +151,7 @@ class EmployeeTraining(BaseModel):
     supervisor_notes = Column(Text)
     
     # Relationships
-    employee = relationship("User", foreign_keys=[employee_id], back_populates="training_records")
+    employee = relationship("User", foreign_keys=[employee_id])
     program = relationship("TrainingProgram", back_populates="employee_records")
     assigned_by = relationship("User", foreign_keys=[assigned_by_id])
     assessments = relationship("TrainingAssessment", back_populates="employee_training")

@@ -1,0 +1,175 @@
+/* QMS Platform v3.0 - Global Styles */
+
+:root {
+  /* QMS Brand Colors - Pharmaceutical Industry Standard */
+  --qms-primary: #1976d2;
+  --qms-secondary: #dc004e;
+  --qms-success: #2e7d32;
+  --qms-warning: #ed6c02;
+  --qms-error: #d32f2f;
+  --qms-info: #0288d1;
+  
+  /* Pharmaceutical Compliance Colors */
+  --qms-approved: #4caf50;
+  --qms-pending: #ff9800;
+  --qms-rejected: #f44336;
+  --qms-draft: #9e9e9e;
+  
+  /* Background Colors */
+  --qms-bg-primary: #ffffff;
+  --qms-bg-secondary: #f5f5f5;
+  --qms-bg-paper: #ffffff;
+  
+  /* Text Colors */
+  --qms-text-primary: rgba(0, 0, 0, 0.87);
+  --qms-text-secondary: rgba(0, 0, 0, 0.6);
+  --qms-text-disabled: rgba(0, 0, 0, 0.38);
+  
+  /* Border and Dividers */
+  --qms-divider: rgba(0, 0, 0, 0.12);
+  --qms-border: rgba(0, 0, 0, 0.23);
+  
+  /* Shadows */
+  --qms-shadow-1: 0px 2px 1px -1px rgba(0,0,0,0.2), 0px 1px 1px 0px rgba(0,0,0,0.14), 0px 1px 3px 0px rgba(0,0,0,0.12);
+  --qms-shadow-2: 0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12);
+  
+  /* Layout */
+  --qms-header-height: 64px;
+  --qms-sidebar-width: 280px;
+  --qms-sidebar-collapsed-width: 72px;
+  
+  /* Transitions */
+  --qms-transition-duration: 0.3s;
+  --qms-transition-easing: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Reset and Base Styles */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--qms-text-primary);
+  background-color: var(--qms-bg-secondary);
+  height: 100%;
+  overflow-x: hidden;
+}
+
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+/* Links */
+a {
+  color: var(--qms-primary);
+  text-decoration: none;
+  transition: color var(--qms-transition-duration) var(--qms-transition-easing);
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--qms-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--qms-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--qms-text-secondary);
+}
+
+/* Utility Classes */
+.qms-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.qms-error {
+  color: var(--qms-error);
+  text-align: center;
+  padding: 20px;
+}
+
+.qms-success {
+  color: var(--qms-success);
+}
+
+.qms-warning {
+  color: var(--qms-warning);
+}
+
+.qms-info {
+  color: var(--qms-info);
+}
+
+/* Status Indicators */
+.status-approved {
+  color: var(--qms-approved);
+  font-weight: 500;
+}
+
+.status-pending {
+  color: var(--qms-pending);
+  font-weight: 500;
+}
+
+.status-rejected {
+  color: var(--qms-rejected);
+  font-weight: 500;
+}
+
+.status-draft {
+  color: var(--qms-draft);
+  font-weight: 500;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  :root {
+    --qms-sidebar-width: 100%;
+    --qms-header-height: 56px;
+  }
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+}

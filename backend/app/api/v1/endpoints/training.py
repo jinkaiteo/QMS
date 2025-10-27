@@ -121,8 +121,13 @@ async def list_training_assignments(
     training_service: TrainingService = Depends(get_training_service)
 ):
     """List training assignments with filtering"""
-    # Implementation would be added to training_service
-    pass
+    return training_service.list_training_assignments(
+        employee_id=employee_id,
+        program_id=program_id,
+        status=status,
+        skip=skip,
+        limit=limit
+    )
 
 
 @router.get("/assignments/{assignment_id}", response_model=EmployeeTraining)
@@ -236,8 +241,7 @@ async def get_training_dashboard(
     training_service: TrainingService = Depends(get_training_service)
 ):
     """Get training management dashboard data"""
-    # Implementation would be added to training_service
-    pass
+    return training_service.get_dashboard_stats()
 
 
 # Training Sessions (Future Enhancement)
@@ -283,8 +287,7 @@ async def get_my_training(
     training_service: TrainingService = Depends(get_training_service)
 ):
     """Get current user's training assignments"""
-    # Implementation would filter by current_user.id
-    pass
+    return training_service.get_my_training_assignments(status)
 
 
 @router.put("/my-training/{assignment_id}/start")

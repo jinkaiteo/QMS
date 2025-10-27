@@ -230,8 +230,10 @@ class CAPAService:
         
         # Check permission
         if action.assigned_to != user_id:
-            # TODO: Check if user has management permission
-            raise ValueError("Only assigned user can complete action")
+            # Check if user has management permission to complete actions for others
+            if not (self.current_user.has_permission("capa.manage_all", "qrm") or
+                    self.current_user.has_permission("management.override", "core")):
+                raise ValueError("Only assigned user or manager can complete action")
         
         action.status = "completed"
         action.completed_date = date.today()
@@ -384,6 +386,28 @@ class CAPAService:
         if capa.assigned_to == user_id:
             return True
         
-        # TODO: Implement role-based permissions
+        # Role-based permissions implementation
+        
+        # Global CAPA access (Quality Managers, Administrators)
+        if self.current_user.has_permission("capa.read_all", "qrm"):
+            return True
+            
+        # Department-level access (Department Managers)
+        if (self.current_user.has_permission("capa.read_department", "qrm") and
+            capa.assigned_user and capa.assigned_user.department_id == self.current_user.department_id):
+            return True
+            
+        # Organization-level access (Quality Directors)
+        if (self.current_user.has_permission("capa.read_organization", "qrm") and
+            capa.assigned_user and capa.assigned_user.organization_id == self.current_user.organization_id):
+            return True
+            
+        # Quality event initiator has access to related CAPAs
+        if (capa.quality_event and capa.quality_event.reported_by == user_id):
+            return True
+            
+        # Management override permission
+        if self.current_user.has_permission("management.view_all", "core"):
+            return True
         
         return False

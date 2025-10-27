@@ -96,3 +96,23 @@ async def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.commit()
     
     return {"message": "User deleted successfully"}
+
+
+@router.get("/employees", response_model=List[dict])
+async def get_employees(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """Get list of employees for training assignment"""
+    users = db.query(User).filter(User.is_deleted == False).offset(skip).limit(limit).all()
+    
+    # Format for frontend compatibility
+    employees = []
+    for user in users:
+        department_name = user.department.name if user.department else "Unknown"
+        employees.append({
+            "id": str(user.id),
+            "name": f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else user.username,
+            "email": user.email,
+            "department": department_name,
+            "jobRole": user.employee_id or "Employee"
+        })
+    
+    return employees

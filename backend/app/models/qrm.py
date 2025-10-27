@@ -92,9 +92,9 @@ class QualityEvent(BaseModel):
     # Relationships
     event_type = relationship("QualityEventType", back_populates="quality_events")
     department = relationship("Department", foreign_keys=[department_id])
-    reporter = relationship("User", foreign_keys=[reporter_id], back_populates="reported_quality_events")
-    assignee = relationship("User", foreign_keys=[assigned_to], back_populates="assigned_quality_events")
-    investigator = relationship("User", foreign_keys=[investigator_id], back_populates="investigated_quality_events")
+    reporter = relationship("User", foreign_keys=[reporter_id])
+    assignee = relationship("User", foreign_keys=[assigned_to])
+    investigator = relationship("User", foreign_keys=[investigator_id])
     
     # Self-referential relationship
     parent_event = relationship("QualityEvent", remote_side="QualityEvent.id")
@@ -225,9 +225,9 @@ class CAPA(BaseModel):
     # Relationships
     quality_event = relationship("QualityEvent", back_populates="capas")
     investigation = relationship("QualityInvestigation", foreign_keys=[investigation_id])
-    owner = relationship("User", foreign_keys=[owner_id], back_populates="owned_capas")
+    owner = relationship("User", foreign_keys=[owner_id])
     responsible_department = relationship("Department", foreign_keys=[responsible_department_id])
-    assignee = relationship("User", foreign_keys=[assigned_to], back_populates="assigned_capas")
+    assignee = relationship("User", foreign_keys=[assigned_to])
     reviewer = relationship("User", foreign_keys=[reviewed_by])
     approver = relationship("User", foreign_keys=[approved_by])
     
@@ -266,7 +266,7 @@ class CAPAAction(BaseModel):
     
     # Relationships
     capa = relationship("CAPA", back_populates="actions")
-    assignee = relationship("User", foreign_keys=[assigned_to], back_populates="assigned_capa_actions")
+    assignee = relationship("User", foreign_keys=[assigned_to])
     department = relationship("Department", foreign_keys=[department_id])
     verifier = relationship("User", foreign_keys=[verified_by])
 
@@ -362,7 +362,7 @@ class ChangeControlRequest(BaseModel):
     related_documents = Column(ARRAY(Integer), default=[], comment="Array of document IDs")
     
     # Relationships
-    initiator = relationship("User", foreign_keys=[initiator_id], back_populates="initiated_change_requests")
+    initiator = relationship("User", foreign_keys=[initiator_id])
     assignee = relationship("User", foreign_keys=[assigned_to])
     change_owner = relationship("User", foreign_keys=[change_owner_id])
     technical_reviewer = relationship("User", foreign_keys=[technical_reviewer_id])
@@ -429,7 +429,7 @@ class RiskAssessment(BaseModel):
     related_documents = Column(ARRAY(Integer), default=[], comment="Array of document IDs")
     
     # Relationships
-    lead_assessor = relationship("User", foreign_keys=[lead_assessor_id], back_populates="led_risk_assessments")
+    lead_assessor = relationship("User", foreign_keys=[lead_assessor_id])
     reviewer = relationship("User", foreign_keys=[reviewed_by])
     approver = relationship("User", foreign_keys=[approved_by])
 

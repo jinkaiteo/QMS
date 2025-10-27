@@ -398,3 +398,118 @@ class TrainingService:
         employee_id = assignment.employee_id
         
         return f"CERT-{year}-{program_code}-{employee_id:05d}"
+
+    # API Support Methods
+    def get_dashboard_stats(self) -> Dict[str, Any]:
+        """Get training dashboard statistics"""
+        try:
+            # Count total programs
+            total_programs = self.db.query(TrainingProgram).filter(
+                TrainingProgram.retirement_date.is_(None)
+            ).count()
+            
+            # Count active assignments
+            active_assignments = self.db.query(EmployeeTraining).filter(
+                EmployeeTraining.status.in_([
+                    TrainingStatus.NOT_STARTED,
+                    TrainingStatus.IN_PROGRESS
+                ])
+            ).count()
+            
+            # Count completed this month
+            current_month = datetime.utcnow().replace(day=1)
+            completed_this_month = self.db.query(EmployeeTraining).filter(
+                and_(
+                    EmployeeTraining.completion_date >= current_month,
+                    EmployeeTraining.status == TrainingStatus.COMPLETED
+                )
+            ).count()
+            
+            # Count overdue trainings
+            overdue_trainings = self.db.query(EmployeeTraining).filter(
+                and_(
+                    EmployeeTraining.due_date < datetime.utcnow(),
+                    EmployeeTraining.status.in_([
+                        TrainingStatus.NOT_STARTED,
+                        TrainingStatus.IN_PROGRESS
+                    ])
+                )
+            ).count()
+            
+            # Calculate compliance rate
+            total_due = self.db.query(EmployeeTraining).filter(
+                EmployeeTraining.due_date <= datetime.utcnow()
+            ).count()
+            
+            completed_on_time = self.db.query(EmployeeTraining).filter(
+                and_(
+                    EmployeeTraining.due_date <= datetime.utcnow(),
+                    EmployeeTraining.status == TrainingStatus.COMPLETED,
+                    EmployeeTraining.completion_date <= EmployeeTraining.due_date
+                )
+            ).count()
+            
+            compliance_rate = (completed_on_time / total_due * 100) if total_due > 0 else 100
+            
+            return {
+                "totalPrograms": total_programs,
+                "activeAssignments": active_assignments,
+                "completedThisMonth": completed_this_month,
+                "overdueTrainings": overdue_trainings,
+                "complianceRate": round(compliance_rate, 1)
+            }
+            
+        except Exception as e:
+            # Return fallback data in case of error
+            return {
+                "totalPrograms": 0,
+                "activeAssignments": 0,
+                "completedThisMonth": 0,
+                "overdueTrainings": 0,
+                "complianceRate": 0
+            }
+
+    def get_my_training_assignments(self, status: Optional[str] = None) -> List[EmployeeTraining]:
+        """Get current user's training assignments"""
+        query = self.db.query(EmployeeTraining).filter(
+            EmployeeTraining.employee_id == self.current_user.id
+        )
+        
+        if status:
+            try:
+                training_status = TrainingStatus(status)
+                query = query.filter(EmployeeTraining.status == training_status)
+            except ValueError:
+                # Invalid status, return empty list
+                return []
+        
+        return query.order_by(EmployeeTraining.due_date.asc()).all()
+
+    def list_training_assignments(
+        self,
+        employee_id: Optional[int] = None,
+        program_id: Optional[int] = None,
+        status: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[EmployeeTraining]:
+        """List training assignments with filtering"""
+        query = self.db.query(EmployeeTraining)
+        
+        if employee_id:
+            query = query.filter(EmployeeTraining.employee_id == employee_id)
+        
+        if program_id:
+            query = query.filter(EmployeeTraining.program_id == program_id)
+        
+        if status:
+            try:
+                training_status = TrainingStatus(status)
+                query = query.filter(EmployeeTraining.status == training_status)
+            except ValueError:
+                # Invalid status, return empty list
+                return []
+        
+        return query.offset(skip).limit(limit).order_by(
+            EmployeeTraining.due_date.asc()
+        ).all()

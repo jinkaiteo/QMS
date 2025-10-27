@@ -531,8 +531,30 @@ class DocumentService:
             if document.confidentiality_level in ["public", "internal"]:
                 return True
         
-        # TODO: Implement more sophisticated permission checking
-        # based on roles, document permissions table, etc.
+        # Sophisticated permission checking based on roles and hierarchy
+        
+        # Check if user has global document access permissions
+        if self.current_user.has_permission("document.read_all", "edms"):
+            return True
+            
+        # Check if user has department-level access
+        if (self.current_user.has_permission("document.read_department", "edms") and 
+            document.author.department_id == self.current_user.department_id):
+            return True
+            
+        # Check if user is document owner or author
+        if document.author_id == self.current_user.id or document.owner_id == self.current_user.id:
+            return True
+            
+        # Check if user is in the same organization
+        if (self.current_user.has_permission("document.read_organization", "edms") and
+            document.author.organization_id == self.current_user.organization_id):
+            return True
+            
+        # Check if user has management role and document is in their department
+        if (self.current_user.has_permission("management.view", "core") and
+            document.author.department_id == self.current_user.department_id):
+            return True
         
         return False
     
