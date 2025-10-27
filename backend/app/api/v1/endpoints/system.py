@@ -3,6 +3,7 @@
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from app.core.database import get_db, db_manager
 from app.core.config import settings
@@ -21,7 +22,7 @@ async def health_check():
     # Application health
     health_status = {
         "status": "healthy" if db_health["status"] == "healthy" else "unhealthy",
-        "timestamp": "2024-01-01T00:00:00Z",  # TODO: Use actual timestamp
+        "timestamp": datetime.utcnow().isoformat() + "Z",
         "version": settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
         "components": {"database": db_health, "application": {"status": "healthy", "version": settings.APP_VERSION}},
