@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
 from enum import Enum
+from uuid import UUID
 
 
 class DocumentStatusEnum(str, Enum):
@@ -58,7 +59,7 @@ class DocumentTypeUpdate(BaseModel):
 
 class DocumentType(DocumentTypeBase):
     id: int
-    uuid: str
+    uuid: UUID
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -92,7 +93,7 @@ class DocumentCategoryUpdate(BaseModel):
 
 class DocumentCategory(DocumentCategoryBase):
     id: int
-    uuid: str
+    uuid: UUID
     is_active: bool
     created_at: datetime
     updated_at: datetime

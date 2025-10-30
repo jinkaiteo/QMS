@@ -1,0 +1,1 @@
+# Analytics Integration Adapters for QMS Modules

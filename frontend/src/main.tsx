@@ -5,8 +5,8 @@ import { BrowserRouter } from 'react-router-dom'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 
-import App from './App'
-import { store } from './store/store'
+import App from './App-Production'
+import { store } from './store/store-simple'
 
 // Simple theme
 const theme = createTheme({

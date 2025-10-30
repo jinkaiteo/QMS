@@ -1,0 +1,42 @@
+[flake8]
+# QMS Flake8 Configuration
+
+# Maximum line length
+max-line-length = 127
+
+# Error codes to ignore
+ignore = 
+    E203,  # whitespace before ':'
+    E501,  # line too long (handled by black)
+    W503,  # line break before binary operator
+    F401,  # imported but unused (in __init__.py files)
+
+# Directories to exclude
+exclude = 
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    .env,
+    migrations,
+    .pytest_cache,
+    htmlcov,
+    build,
+    dist,
+    *.egg-info
+
+# Files to exclude
+per-file-ignores =
+    __init__.py:F401
+    */migrations/*:E501,F401
+    */tests/*:F401,F811
+    conftest.py:F401,F811
+
+# Maximum complexity
+max-complexity = 10
+
+# Docstring conventions
+docstring-convention = google
+
+# Import order
+import-order-style = google

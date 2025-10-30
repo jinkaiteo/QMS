@@ -78,7 +78,7 @@ class AuthService {
   }
 
   // Check if user has specific permission (simplified for demo)
-  hasPermission(user: User | null, permission: string): boolean {
+  checkPermission(user: User | null, permission: string): boolean {
     if (!user) return false
     
     // For demo purposes, admin users have all permissions

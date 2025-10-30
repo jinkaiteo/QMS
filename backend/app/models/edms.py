@@ -24,6 +24,7 @@ class DocumentType(BaseModel):
     description = Column(Text)
     template_file_path = Column(String(500))
     is_controlled = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=True, nullable=False)
     retention_period_years = Column(Integer, default=7)
 
     # Relationships
@@ -39,6 +40,7 @@ class DocumentCategory(BaseModel):
     description = Column(Text)
     color = Column(String(7), comment="Hex color code")
     icon = Column(String(50))
+    is_active = Column(Boolean, default=True, nullable=False)
 
     # Self-referential relationship for hierarchy
     parent = relationship("DocumentCategory", remote_side="DocumentCategory.id")

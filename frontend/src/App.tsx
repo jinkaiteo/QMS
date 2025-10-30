@@ -13,7 +13,16 @@ const LIMSPage = React.lazy(() => import('./pages/LIMS/LIMSPage'))
 const TrainingPage = React.lazy(() => import('./pages/Training/TrainingPage'))
 const QualityPage = React.lazy(() => import('./pages/Quality/QualityPage'))
 const UsersPage = React.lazy(() => import('./pages/Users/UsersPage'))
+const OrganizationPage = React.lazy(() => import('./pages/Organization/OrganizationPage'))
 const SettingsPage = React.lazy(() => import('./pages/Settings/SettingsPage'))
+
+// Phase C: Advanced Analytics Pages
+const ExecutiveAnalyticsDashboard = React.lazy(() => import('./pages/Analytics/ExecutiveAnalyticsDashboard'))
+const PredictiveSchedulingDashboard = React.lazy(() => import('./pages/Analytics/PredictiveSchedulingDashboard'))
+const AdvancedDashboard = React.lazy(() => import('./pages/Analytics/AdvancedDashboard'))
+const AnalyticsMainPage = React.lazy(() => import('./pages/Analytics/AnalyticsMainPage'))
+const ComplianceDashboard = React.lazy(() => import('./pages/Analytics/ComplianceDashboard'))
+const NotificationDashboard = React.lazy(() => import('./pages/Analytics/NotificationDashboard'))
 
 // Simple loading component
 const LoadingScreen: React.FC = () => (
@@ -148,11 +157,83 @@ const App: React.FC = () => {
             } 
           />
           <Route 
+            path="/organization" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <OrganizationPage />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/settings" 
             element={
               <ProtectedRoute>
                 <Layout>
                   <SettingsPage />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Phase C: Advanced Analytics Routes */}
+          <Route 
+            path="/analytics" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AnalyticsMainPage />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/analytics/executive" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ExecutiveAnalyticsDashboard />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/analytics/predictive-scheduling" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <PredictiveSchedulingDashboard />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/analytics/advanced" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AdvancedDashboard />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/compliance" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ComplianceDashboard />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/notifications" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <NotificationDashboard />
                 </Layout>
               </ProtectedRoute>
             } 

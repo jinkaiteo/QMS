@@ -8,6 +8,10 @@ volumes:
   postgres_prod_data:
   redis_prod_data:
   minio_prod_data:
+  ml_storage_prod_data:
+  ml_models_data:
+  compliance_reports_data:
+  elasticsearch_prod_data:
   qms_logs:
   prometheus_prod_data:
   grafana_prod_data:
@@ -87,9 +91,9 @@ services:
     environment:
       ENVIRONMENT: production
       POSTGRES_SERVER: qms-db-prod
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${POSTGRES_DB:-qms_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-qms_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       REDIS_URL: redis://:${REDIS_PASSWORD}@qms-redis-prod:6379/0
       SECRET_KEY: ${SECRET_KEY}
@@ -98,9 +102,44 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       DOCUMENT_STORAGE_PATH: /app/storage/documents
+      # AI/ML Configuration
+      ML_REDIS_URL: redis://:${ML_REDIS_PASSWORD:-${REDIS_PASSWORD}}@qms-ml-storage-prod:6379/0
+      ML_MODEL_STORAGE_PATH: /app/ml_models
+      PREDICTION_CACHE_TTL: ${PREDICTION_CACHE_TTL:-3600}
+      ML_TRAINING_ENABLED: ${ML_TRAINING_ENABLED:-true}
+      # Analytics Configuration
+      ANALYTICS_CACHE_TTL: ${ANALYTICS_CACHE_TTL:-300}
+      REAL_TIME_ANALYTICS: ${REAL_TIME_ANALYTICS:-true}
+      ANALYTICS_BATCH_SIZE: ${ANALYTICS_BATCH_SIZE:-1000}
+      # Compliance Configuration
+      COMPLIANCE_CHECK_INTERVAL: ${COMPLIANCE_CHECK_INTERVAL:-86400}
+      AUDIT_LOG_RETENTION_DAYS: ${AUDIT_LOG_RETENTION_DAYS:-2555}
+      CFR_PART11_ENABLED: ${CFR_PART11_ENABLED:-true}
+      ISO13485_ENABLED: ${ISO13485_ENABLED:-true}
+      # Notification Configuration
+      NOTIFICATION_BATCH_SIZE: ${NOTIFICATION_BATCH_SIZE:-100}
+      EMAIL_RATE_LIMIT: ${EMAIL_RATE_LIMIT:-1000}
+      SMS_RATE_LIMIT: ${SMS_RATE_LIMIT:-100}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      EMAIL_FROM: ${EMAIL_FROM}
+      # Performance Configuration
+      API_RATE_LIMIT: ${API_RATE_LIMIT:-1000}
+      CACHE_DEFAULT_TTL: ${CACHE_DEFAULT_TTL:-300}
+      DATABASE_CONNECTION_POOL_SIZE: ${DATABASE_CONNECTION_POOL_SIZE:-50}
+      # Feature Flags
+      ENABLE_ADVANCED_ANALYTICS: ${ENABLE_ADVANCED_ANALYTICS:-true}
+      ENABLE_PREDICTIVE_SCHEDULING: ${ENABLE_PREDICTIVE_SCHEDULING:-true}
+      ENABLE_COMPLIANCE_AUTOMATION: ${ENABLE_COMPLIANCE_AUTOMATION:-true}
+      ENABLE_NOTIFICATION_SYSTEM: ${ENABLE_NOTIFICATION_SYSTEM:-true}
+      ENABLE_AI_INSIGHTS: ${ENABLE_AI_INSIGHTS:-true}
     volumes:
       - qms_logs:/app/logs
       - ./storage:/app/storage
+      - ml_models_data:/app/ml_models
+      - compliance_reports_data:/app/compliance_reports
     networks:
       - qms-prod
     ports:
@@ -111,6 +150,8 @@ services:
       qms-redis-prod:
         condition: service_healthy
       qms-minio-prod:
+        condition: service_healthy
+      qms-ml-storage-prod:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -170,3 +211,49 @@ services:
       - "3000:3000"
     depends_on:
       - qms-prometheus-prod
+
+  # ML Model Storage (Dedicated Redis for ML)
+  qms-ml-storage-prod:
+    image: redis:7-alpine
+    container_name: qms-ml-storage-prod
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass "${ML_REDIS_PASSWORD:-${REDIS_PASSWORD}}"
+    volumes:
+      - ml_storage_prod_data:/data
+    networks:
+      - qms-prod
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--pass", "${ML_REDIS_PASSWORD:-${REDIS_PASSWORD}}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Elasticsearch for Advanced Search (Optional)
+  qms-elasticsearch-prod:
+    image: elasticsearch:8.11.0
+    container_name: qms-elasticsearch-prod
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_prod_data:/usr/share/elasticsearch/data
+    networks:
+      - qms-prod
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+    profiles:
+      - search  # Optional service, enable with --profile search

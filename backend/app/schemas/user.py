@@ -3,7 +3,8 @@
 
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, validator, Field
+from uuid import UUID
 
 from app.models.user import UserStatus
 
@@ -45,7 +46,7 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     """User response schema"""
     id: int
-    uuid: str
+    uuid: UUID
     status: UserStatus
     organization_id: Optional[int]
     department_id: Optional[int]
@@ -69,7 +70,7 @@ class RoleBase(BaseModel):
 class RoleResponse(RoleBase):
     """Role response schema"""
     id: int
-    uuid: str
+    uuid: UUID
     is_active: bool
     created_at: datetime
     
@@ -89,7 +90,7 @@ class OrganizationBase(BaseModel):
 class OrganizationResponse(OrganizationBase):
     """Organization response schema"""
     id: int
-    uuid: str
+    uuid: UUID
     is_active: bool
     created_at: datetime
     

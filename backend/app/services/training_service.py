@@ -33,7 +33,7 @@ class TrainingService:
     def __init__(self, db: Session, current_user: User):
         self.db = db
         self.current_user = current_user
-        self.audit_service = AuditService(db, current_user)
+        self.audit_service = AuditService()
 
     # Training Program Management
     def create_training_program(self, program_data: TrainingProgramCreate) -> TrainingProgram:

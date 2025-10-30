@@ -2,10 +2,11 @@
 # Phase 1: Application settings and environment configuration
 
 from typing import List, Optional, Any, Dict
-from pydantic import AnyHttpUrl, validator, PostgresDsn
+from pydantic import AnyHttpUrl, field_validator, computed_field
 from pydantic_settings import BaseSettings
 import os
 from pathlib import Path
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -30,24 +31,15 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str
     POSTGRES_DB: str
     POSTGRES_PORT: str = "5432"
-    DATABASE_URL: Optional[PostgresDsn] = None
     
-    @validator("DATABASE_URL", pre=True)
-    def assemble_db_connection(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
-        if isinstance(v, str):
-            return v
-        
-        # Build PostgreSQL URL manually for Pydantic v2 compatibility
-        user = values.get("POSTGRES_USER", "")
-        password = values.get("POSTGRES_PASSWORD", "")
-        host = values.get("POSTGRES_SERVER", "localhost")
-        port = values.get("POSTGRES_PORT", "5432")
-        db = values.get("POSTGRES_DB", "")
-        
-        if user and password:
-            return f"postgresql://{user}:{password}@{host}:{port}/{db}"
+    @computed_field
+    @property
+    def DATABASE_URL(self) -> str:
+        """Assemble database URL from components"""
+        if self.POSTGRES_USER and self.POSTGRES_PASSWORD:
+            return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
         else:
-            return f"postgresql://{host}:{port}/{db}"
+            return f"postgresql://{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -58,15 +50,21 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
     
     # CORS
-    BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
+    BACKEND_CORS_ORIGINS: List[str] = []
     
-    @validator("BACKEND_CORS_ORIGINS", pre=True)
-    def assemble_cors_origins(cls, v: str | List[str]) -> List[str] | str:
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v):
+        if isinstance(v, str):
+            if not v or v.strip() == "":
+                return []
+            if not v.startswith("["):
+                return [i.strip() for i in v.split(",") if i.strip()]
+        elif isinstance(v, list):
             return v
-        raise ValueError(v)
+        elif v is None:
+            return []
+        return v
     
     # Trusted hosts for production
     ALLOWED_HOSTS: List[str] = [
@@ -152,7 +150,7 @@ class Settings(BaseSettings):
     BACKUP_PATH: str = "/app/backups"
     
     class Config:
-        env_file = ".env"
+        # env_file = ".env"  # Temporarily disabled for container deployment
         case_sensitive = True
 
 

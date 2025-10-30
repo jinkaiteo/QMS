@@ -1,0 +1,45 @@
+{
+  "success_rate": 100.0,
+  "passed_tests": 6,
+  "total_tests": 6,
+  "backend_tests": 5,
+  "frontend_tests": 1,
+  "details": [
+    {
+      "test": "Backend Health Check",
+      "success": true,
+      "details": "Status: 200, Response: {'status': 'healthy', 'timestamp': '2025-10-27T22:12:42.154237'}",
+      "timestamp": "2025-10-27 22:12:42"
+    },
+    {
+      "test": "Department Hierarchy API",
+      "success": true,
+      "details": "Retrieved 2 departments with nested hierarchy, First department has 1 children",
+      "timestamp": "2025-10-27 22:12:42"
+    },
+    {
+      "test": "Department Creation API",
+      "success": true,
+      "details": "Created department 'Integration Test Department' with ID 12",
+      "timestamp": "2025-10-27 22:12:42"
+    },
+    {
+      "test": "Role Management APIs",
+      "success": true,
+      "details": "Retrieved 4 roles and 5 users",
+      "timestamp": "2025-10-27 22:12:42"
+    },
+    {
+      "test": "Role Assignment API",
+      "success": true,
+      "details": "Assigned role 1 to user 1, 1 total assignments",
+      "timestamp": "2025-10-27 22:12:42"
+    },
+    {
+      "test": "Frontend Accessibility",
+      "success": true,
+      "details": "Frontend status: 200",
+      "timestamp": "2025-10-27 22:12:42"
+    }
+  ]
+}

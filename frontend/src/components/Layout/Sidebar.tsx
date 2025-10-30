@@ -108,6 +108,18 @@ const menuItems: MenuItem[] = [
     roles: ['admin', 'manager'],
   },
   {
+    id: 'organization',
+    label: 'Organization',
+    icon: <People />,
+    path: '/organization',
+    permission: 'organization.view',
+    roles: ['admin', 'manager'],
+    children: [
+      { id: 'org-hierarchy', label: 'Department Hierarchy', icon: <AnalyticsOutlined />, path: '/organization' },
+      { id: 'org-roles', label: 'Role Matrix', icon: <SecurityOutlined />, path: '/organization' },
+    ],
+  },
+  {
     id: 'settings',
     label: 'System Settings',
     icon: <Settings />,

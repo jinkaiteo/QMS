@@ -1,0 +1,126 @@
+{
+  "summary": {
+    "total_tests": 16,
+    "passed": 8,
+    "failed": 6,
+    "partial": 2,
+    "pass_rate": 50.0,
+    "duration_seconds": 0.43503,
+    "start_time": "2025-10-30T10:49:12.854476",
+    "end_time": "2025-10-30T10:49:13.289506"
+  },
+  "detailed_results": [
+    {
+      "test_name": "Root API Access",
+      "status": "PASS",
+      "details": "API accessible, version: 1.0.0",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:12.900377"
+    },
+    {
+      "test_name": "API Documentation",
+      "status": "FAIL",
+      "details": "Status: 0",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:12.902720"
+    },
+    {
+      "test_name": "System Health Check",
+      "status": "PASS",
+      "details": "Status: unhealthy",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:13.005297"
+    },
+    {
+      "test_name": "Auth Test Endpoint",
+      "status": "FAIL",
+      "details": "Status: 404, Error: {'success': False, 'error': {'code': 'NOT_FOUND', 'message': 'The requested resource was not found'}, 'timestamp': 1761792553.008267}",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:13.011450"
+    },
+    {
+      "test_name": "Login Endpoint Structure",
+      "status": "PASS",
+      "details": "Login endpoint validates input correctly",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:13.019134"
+    },
+    {
+      "test_name": "Protected Endpoint Security",
+      "status": "FAIL",
+      "details": "Unexpected access: 422",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:13.022498"
+    },
+    {
+      "test_name": "Users Endpoint Security",
+      "status": "FAIL",
+      "details": "Unexpected response: 500",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:13.258915"
+    },
+    {
+      "test_name": "User Registration Structure",
+      "status": "FAIL",
+      "details": "Unexpected error: {'detail': 'Method Not Allowed'}",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:13.262173"
+    },
+    {
+      "test_name": "Training Programs Endpoint",
+      "status": "PASS",
+      "details": "Training endpoint accessible",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:13.267299"
+    },
+    {
+      "test_name": "Training Program Creation",
+      "status": "PASS",
+      "details": "Training creation endpoint structured correctly",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:13.271433"
+    },
+    {
+      "test_name": "System Info",
+      "status": "PASS",
+      "details": "System information accessible",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:13.273692"
+    },
+    {
+      "test_name": "System Version",
+      "status": "PARTIAL",
+      "details": "Status: 404",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:13.276652"
+    },
+    {
+      "test_name": "OpenAPI Specification",
+      "status": "FAIL",
+      "details": "Status: 404",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:13.279009"
+    },
+    {
+      "test_name": "ReDoc Documentation",
+      "status": "PARTIAL",
+      "details": "Status: 404",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:13.282034"
+    },
+    {
+      "test_name": "404 Error Handling",
+      "status": "PASS",
+      "details": "Non-existent endpoints return 404",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:13.284970"
+    },
+    {
+      "test_name": "Invalid JSON Handling",
+      "status": "PASS",
+      "details": "Invalid JSON properly rejected",
+      "response_data": null,
+      "timestamp": "2025-10-30T10:49:13.289449"
+    }
+  ]
+}

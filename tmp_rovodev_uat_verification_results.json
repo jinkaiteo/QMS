@@ -1,0 +1,100 @@
+{
+  "verification_summary": {
+    "total_verifications": 12,
+    "verified_claims": 3,
+    "partial_claims": 0,
+    "discrepant_claims": 9,
+    "verification_accuracy": 25.0,
+    "claimed_pass_rate": 100.0,
+    "actual_pass_rate": 20.0,
+    "accuracy_gap": 80.0,
+    "assessment": "SIGNIFICANT_DISCREPANCIES",
+    "timestamp": "2025-10-29T16:24:02.692187"
+  },
+  "verification_results": {
+    "Backend Health Check": {
+      "claimed_result": "WORKING (Health endpoint accessible)",
+      "actual_result": "NOT WORKING (<urlopen error [Errno 111] Connection refused>)",
+      "verification_status": "DISCREPANCY",
+      "notes": "Backend not accessible despite claims",
+      "timestamp": "2025-10-29T16:24:02.380499"
+    },
+    "Authentication Login Endpoint": {
+      "claimed_result": "WORKING (JWT generation, correct endpoints)",
+      "actual_result": "NOT ACCESSIBLE (<urlopen error [Errno 111] Connection refused>)",
+      "verification_status": "DISCREPANCY",
+      "notes": "",
+      "timestamp": "2025-10-29T16:24:02.380773"
+    },
+    "Authentication Auth Base": {
+      "claimed_result": "WORKING (JWT generation, correct endpoints)",
+      "actual_result": "NOT ACCESSIBLE (<urlopen error [Errno 111] Connection refused>)",
+      "verification_status": "DISCREPANCY",
+      "notes": "",
+      "timestamp": "2025-10-29T16:24:02.380951"
+    },
+    "Overall Authentication System": {
+      "claimed_result": "100% WORKING (JWT, security, all endpoints)",
+      "actual_result": "NOT WORKING (0/2 endpoints)",
+      "verification_status": "DISCREPANCY",
+      "notes": "",
+      "timestamp": "2025-10-29T16:24:02.380964"
+    },
+    "API User Management": {
+      "claimed_result": "ACCESSIBLE (Auth required/working)",
+      "actual_result": "NOT ACCESSIBLE (<urlopen error [Errno 111] Connection refused>)",
+      "verification_status": "DISCREPANCY",
+      "notes": "",
+      "timestamp": "2025-10-29T16:24:02.381216"
+    },
+    "API Training Programs": {
+      "claimed_result": "ACCESSIBLE (Auth required/working)",
+      "actual_result": "NOT ACCESSIBLE (<urlopen error [Errno 111] Connection refused>)",
+      "verification_status": "DISCREPANCY",
+      "notes": "",
+      "timestamp": "2025-10-29T16:24:02.381398"
+    },
+    "API Document Management": {
+      "claimed_result": "ACCESSIBLE (Auth required/working)",
+      "actual_result": "NOT ACCESSIBLE (<urlopen error [Errno 111] Connection refused>)",
+      "verification_status": "DISCREPANCY",
+      "notes": "",
+      "timestamp": "2025-10-29T16:24:02.381658"
+    },
+    "API Advanced Analytics": {
+      "claimed_result": "ACCESSIBLE (Auth required/working)",
+      "actual_result": "NOT ACCESSIBLE (<urlopen error [Errno 111] Connection refused>)",
+      "verification_status": "DISCREPANCY",
+      "notes": "",
+      "timestamp": "2025-10-29T16:24:02.381871"
+    },
+    "API System API": {
+      "claimed_result": "ACCESSIBLE (Auth required/working)",
+      "actual_result": "NOT ACCESSIBLE (<urlopen error [Errno 111] Connection refused>)",
+      "verification_status": "DISCREPANCY",
+      "notes": "",
+      "timestamp": "2025-10-29T16:24:02.382032"
+    },
+    "Container Infrastructure": {
+      "claimed_result": "5/7 containers operational (Database, Redis, MinIO, Prometheus, Grafana)",
+      "actual_result": "5 containers running",
+      "verification_status": "VERIFIED",
+      "notes": "Core infrastructure containers operational",
+      "timestamp": "2025-10-29T16:24:02.450008"
+    },
+    "Database Infrastructure": {
+      "claimed_result": "PostgreSQL 18 healthy with production data (3 users confirmed)",
+      "actual_result": "HEALTHY (3 users confirmed, accessible)",
+      "verification_status": "VERIFIED",
+      "notes": "Database connectivity and data confirmed",
+      "timestamp": "2025-10-29T16:24:02.683300"
+    },
+    "Frontend Grafana Dashboard": {
+      "claimed_result": "ACCESSIBLE",
+      "actual_result": "ACCESSIBLE (Status 200)",
+      "verification_status": "VERIFIED",
+      "notes": "",
+      "timestamp": "2025-10-29T16:24:02.691852"
+    }
+  }
+}

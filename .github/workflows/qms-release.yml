@@ -1,0 +1,415 @@
+name: QMS Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+      pre_release:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_BACKEND: qms-backend
+  IMAGE_NAME_FRONTEND: qms-frontend
+
+jobs:
+  # ===========================
+  # Release Validation
+  # ===========================
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Extract version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+          IS_PRERELEASE="${{ github.event.inputs.pre_release }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+          IS_PRERELEASE=false
+        fi
+        
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+        echo "Release version: $VERSION"
+        echo "Pre-release: $IS_PRERELEASE"
+
+    - name: Validate version format
+      run: |
+        if [[ ! "${{ steps.version.outputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
+          echo "Invalid version format: ${{ steps.version.outputs.version }}"
+          echo "Expected format: v1.0.0 or v1.0.0-alpha"
+          exit 1
+        fi
+
+    - name: Check if tag exists (for workflow_dispatch)
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        if git rev-parse "${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+          echo "Tag ${{ steps.version.outputs.version }} already exists"
+          exit 1
+        fi
+
+  # ===========================
+  # Run Full Test Suite
+  # ===========================
+  comprehensive-tests:
+    name: Comprehensive Test Suite
+    runs-on: ubuntu-latest
+    needs: validate-release
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: qms_release_test
+          POSTGRES_USER: qms_user
+          POSTGRES_PASSWORD: release_test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.8'
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-asyncio
+
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+
+    - name: Run backend tests
+      env:
+        ENVIRONMENT: testing
+        DATABASE_URL: postgresql://qms_user:release_test_password@localhost:5432/qms_release_test
+        REDIS_URL: redis://localhost:6379/0
+        SECRET_KEY: release-test-secret
+        JWT_SECRET_KEY: release-test-jwt-secret
+      run: |
+        cd backend
+        pytest tests/ -v --cov=app --cov-report=xml
+
+    - name: Run frontend tests
+      run: |
+        cd frontend
+        npm run test:coverage
+
+    - name: Run integration tests
+      env:
+        ENVIRONMENT: testing
+        DATABASE_URL: postgresql://qms_user:release_test_password@localhost:5432/qms_release_test
+        REDIS_URL: redis://localhost:6379/0
+        SECRET_KEY: release-test-secret
+        JWT_SECRET_KEY: release-test-jwt-secret
+      run: |
+        python backend/tests/integration/integration_test_runner.py
+
+  # ===========================
+  # Build Release Images
+  # ===========================
+  build-release-images:
+    name: Build Release Images
+    runs-on: ubuntu-latest
+    needs: [validate-release, comprehensive-tests]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push backend image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        file: ./backend/Dockerfile
+        push: true
+        tags: |
+          ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME_BACKEND }}:${{ needs.validate-release.outputs.version }}
+          ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME_BACKEND }}:latest
+        labels: |
+          org.opencontainers.image.title=QMS Backend
+          org.opencontainers.image.description=QMS Platform Backend API
+          org.opencontainers.image.version=${{ needs.validate-release.outputs.version }}
+          org.opencontainers.image.revision=${{ github.sha }}
+        platforms: linux/amd64,linux/arm64
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build and push frontend image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        file: ./frontend/Dockerfile
+        push: true
+        tags: |
+          ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ needs.validate-release.outputs.version }}
+          ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME_FRONTEND }}:latest
+        labels: |
+          org.opencontainers.image.title=QMS Frontend
+          org.opencontainers.image.description=QMS Platform Frontend UI
+          org.opencontainers.image.version=${{ needs.validate-release.outputs.version }}
+          org.opencontainers.image.revision=${{ github.sha }}
+        platforms: linux/amd64,linux/arm64
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # ===========================
+  # Security Scan Release Images
+  # ===========================
+  security-scan-release:
+    name: Security Scan Release Images
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-release-images]
+
+    steps:
+    - name: Run Trivy scanner on backend
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME_BACKEND }}:${{ needs.validate-release.outputs.version }}
+        format: 'sarif'
+        output: 'backend-release-trivy.sarif'
+
+    - name: Run Trivy scanner on frontend
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ needs.validate-release.outputs.version }}
+        format: 'sarif'
+        output: 'frontend-release-trivy.sarif'
+
+    - name: Upload security scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: '.'
+
+  # ===========================
+  # Generate Release Artifacts
+  # ===========================
+  generate-artifacts:
+    name: Generate Release Artifacts
+    runs-on: ubuntu-latest
+    needs: [validate-release, comprehensive-tests]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.8'
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm ci
+        npm run build
+
+    - name: Generate deployment manifests
+      run: |
+        mkdir -p release-artifacts/manifests
+        
+        # Generate docker-compose for different environments
+        cp deployment/docker-compose.prod.yml release-artifacts/manifests/
+        cp deployment/podman-compose.prod.yml release-artifacts/manifests/
+        
+        # Generate Kubernetes manifests (if available)
+        if [ -d "k8s" ]; then
+          cp -r k8s release-artifacts/manifests/
+        fi
+
+    - name: Generate changelog
+      run: |
+        echo "# QMS Platform ${{ needs.validate-release.outputs.version }} Release Notes" > release-artifacts/CHANGELOG.md
+        echo "" >> release-artifacts/CHANGELOG.md
+        echo "## What's New" >> release-artifacts/CHANGELOG.md
+        git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 HEAD^)..HEAD >> release-artifacts/CHANGELOG.md || echo "- Initial release" >> release-artifacts/CHANGELOG.md
+
+    - name: Generate SBOM (Software Bill of Materials)
+      run: |
+        mkdir -p release-artifacts/sbom
+        
+        # Backend SBOM
+        cd backend
+        pip install cyclone-dx-bom
+        pip freeze > requirements-frozen.txt
+        cyclone-dx-bom -r requirements-frozen.txt -o ../release-artifacts/sbom/backend-sbom.json
+        cd ..
+        
+        # Frontend SBOM
+        cd frontend
+        npx @cyclonedx/cyclonedx-npm --output-file ../release-artifacts/sbom/frontend-sbom.json
+        cd ..
+
+    - name: Create release archive
+      run: |
+        tar -czf qms-platform-${{ needs.validate-release.outputs.version }}.tar.gz release-artifacts/
+
+    - name: Upload release artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-artifacts-${{ needs.validate-release.outputs.version }}
+        path: |
+          qms-platform-${{ needs.validate-release.outputs.version }}.tar.gz
+          release-artifacts/
+        retention-days: 90
+
+  # ===========================
+  # Create GitHub Release
+  # ===========================
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-release-images, security-scan-release, generate-artifacts]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download release artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: release-artifacts-${{ needs.validate-release.outputs.version }}
+
+    - name: Create Release
+      uses: actions/create-release@v1
+      id: create_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ needs.validate-release.outputs.version }}
+        release_name: QMS Platform ${{ needs.validate-release.outputs.version }}
+        body_path: release-artifacts/CHANGELOG.md
+        draft: false
+        prerelease: ${{ needs.validate-release.outputs.is_prerelease }}
+
+    - name: Upload Release Archive
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: qms-platform-${{ needs.validate-release.outputs.version }}.tar.gz
+        asset_name: qms-platform-${{ needs.validate-release.outputs.version }}.tar.gz
+        asset_content_type: application/gzip
+
+  # ===========================
+  # Deploy to Production
+  # ===========================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [validate-release, create-release]
+    environment: 
+      name: production
+      url: https://qms.yourcompany.com
+    if: needs.validate-release.outputs.is_prerelease == 'false'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy to Production
+      run: |
+        echo "Deploying QMS Platform ${{ needs.validate-release.outputs.version }} to Production"
+        # Add actual production deployment steps here
+        # This could include:
+        # - Updating Kubernetes manifests
+        # - Rolling update deployment
+        # - Database migrations
+        # - Health checks verification
+
+  # ===========================
+  # Post-Release Actions
+  # ===========================
+  post-release:
+    name: Post-Release Actions
+    runs-on: ubuntu-latest
+    needs: [validate-release, create-release, deploy-production]
+    if: always() && needs.create-release.result == 'success'
+
+    steps:
+    - name: Notify Teams
+      run: |
+        echo "QMS Platform ${{ needs.validate-release.outputs.version }} has been released!"
+        # Add notification logic (Slack, Teams, Email, etc.)
+
+    - name: Update Documentation
+      run: |
+        echo "Updating documentation for release ${{ needs.validate-release.outputs.version }}"
+        # Add documentation update logic
+
+    - name: Security Advisory
+      if: needs.validate-release.outputs.is_prerelease == 'false'
+      run: |
+        echo "Publishing security advisory for release ${{ needs.validate-release.outputs.version }}"
+        # Add security advisory publication logic

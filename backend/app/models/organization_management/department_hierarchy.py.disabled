@@ -1,0 +1,217 @@
+# QMS Department Hierarchy Models - Phase A Sprint 2
+# SQLAlchemy models for hierarchical department and organization management
+
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import relationship
+from datetime import datetime
+from typing import List, Optional
+from app.models.base import BaseModel
+
+
+class Department(BaseModel):
+    """Enhanced Department model with hierarchy support"""
+    __tablename__ = "departments"
+    
+    # Basic department information
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    code = Column(String(20), unique=True)
+    description = Column(Text)
+    
+    # Hierarchy fields
+    parent_department_id = Column(Integer, ForeignKey("departments.id"))
+    department_head_id = Column(Integer, ForeignKey("users.id"))
+    cost_center = Column(String(50))
+    location = Column(String(100))
+    department_type = Column(String(50))  # 'operational', 'administrative', 'quality'
+    hierarchy_path = Column(Text)  # Materialized path for efficient queries
+    hierarchy_level = Column(Integer, default=0)
+    
+    # Relationships
+    organization = relationship("Organization", back_populates="departments")
+    parent_department = relationship("Department", remote_side="Department.id", back_populates="child_departments")
+    child_departments = relationship("Department", back_populates="parent_department")
+    department_head = relationship("User", foreign_keys=[department_head_id])
+    users = relationship("User", foreign_keys="User.department_id", back_populates="department")
+    department_roles = relationship("DepartmentRole", back_populates="department", cascade="all, delete-orphan")
+    
+    def __repr__(self):
+        return f"<Department(name='{self.name}', code='{self.code}', level={self.hierarchy_level})>"
+    
+    @property
+    def full_hierarchy_name(self) -> str:
+        """Get full hierarchical name like 'Corporate > Manufacturing > Quality'"""
+        if self.parent_department:
+            return f"{self.parent_department.full_hierarchy_name} > {self.name}"
+        return self.name
+    
+    @property
+    def hierarchy_path_list(self) -> List[int]:
+        """Get hierarchy path as list of department IDs"""
+        if not self.hierarchy_path:
+            return []
+        return [int(x) for x in self.hierarchy_path.split('.') if x]
+    
+    def get_all_descendants(self) -> List['Department']:
+        """Get all descendant departments recursively"""
+        descendants = []
+        for child in self.child_departments:
+            descendants.append(child)
+            descendants.extend(child.get_all_descendants())
+        return descendants
+    
+    def get_all_ancestors(self) -> List['Department']:
+        """Get all ancestor departments up to root"""
+        ancestors = []
+        current = self.parent_department
+        while current:
+            ancestors.append(current)
+            current = current.parent_department
+        return ancestors
+    
+    def is_ancestor_of(self, other_department: 'Department') -> bool:
+        """Check if this department is an ancestor of another department"""
+        if not other_department.hierarchy_path:
+            return False
+        return str(self.id) in other_department.hierarchy_path_list
+    
+    def is_descendant_of(self, other_department: 'Department') -> bool:
+        """Check if this department is a descendant of another department"""
+        return other_department.is_ancestor_of(self)
+    
+    def get_user_count(self, include_children: bool = False) -> int:
+        """Get user count for this department, optionally including child departments"""
+        count = len(self.users)
+        if include_children:
+            for child in self.child_departments:
+                count += child.get_user_count(include_children=True)
+        return count
+
+
+class DepartmentRole(BaseModel):
+    """Department-specific role assignments for users"""
+    __tablename__ = "department_roles"
+    
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+    role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    assigned_by = Column(Integer, ForeignKey("users.id"))
+    valid_from = Column(DateTime, default=datetime.utcnow, nullable=False)
+    valid_until = Column(DateTime)
+    is_active = Column(Boolean, default=True, nullable=False)
+    
+    # Relationships
+    department = relationship("Department", back_populates="department_roles")
+    role = relationship("Role")
+    user = relationship("User", foreign_keys=[user_id])
+    assigned_by_user = relationship("User", foreign_keys=[assigned_by])
+    
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint('department_id', 'role_id', 'user_id', name='uk_department_roles_unique'),
+    )
+    
+    def __repr__(self):
+        return f"<DepartmentRole(dept_id={self.department_id}, role_id={self.role_id}, user_id={self.user_id})>"
+    
+    @property
+    def is_valid(self) -> bool:
+        """Check if role assignment is currently valid"""
+        if not self.is_active:
+            return False
+        
+        now = datetime.utcnow()
+        
+        if self.valid_from and now < self.valid_from:
+            return False
+        
+        if self.valid_until and now > self.valid_until:
+            return False
+        
+        return True
+    
+    @property
+    def days_until_expiry(self) -> Optional[int]:
+        """Get number of days until role expires"""
+        if not self.valid_until:
+            return None
+        
+        delta = self.valid_until - datetime.utcnow()
+        return delta.days if delta.days > 0 else 0
+
+
+class Organization(BaseModel):
+    """Enhanced Organization model with hierarchy support"""
+    __tablename__ = "organizations"
+    
+    # Basic organization information
+    name = Column(String(255), nullable=False)
+    code = Column(String(50), unique=True, nullable=False)
+    description = Column(Text)
+    address = Column(Text)
+    phone = Column(String(50))
+    email = Column(String(255))
+    website = Column(String(255))
+    
+    # Enhanced fields for Sprint 2
+    organization_type = Column(String(50))  # 'manufacturing', 'laboratory', 'corporate'
+    parent_organization_id = Column(Integer, ForeignKey("organizations.id"))
+    regulatory_region = Column(String(50))  # 'FDA', 'EMA', 'PMDA'
+    regulatory_license = Column(String(100))
+    is_active = Column(Boolean, default=True, nullable=False)
+    
+    # Relationships
+    parent_organization = relationship("Organization", remote_side="Organization.id", back_populates="child_organizations")
+    child_organizations = relationship("Organization", back_populates="parent_organization")
+    departments = relationship("Department", back_populates="organization")
+    users = relationship("User", back_populates="organization")
+    
+    def __repr__(self):
+        return f"<Organization(name='{self.name}', code='{self.code}')>"
+    
+    @property
+    def full_hierarchy_name(self) -> str:
+        """Get full organizational hierarchy name"""
+        if self.parent_organization:
+            return f"{self.parent_organization.full_hierarchy_name} > {self.name}"
+        return self.name
+    
+    def get_all_departments(self, include_children: bool = False) -> List[Department]:
+        """Get all departments in this organization"""
+        departments = list(self.departments)
+        
+        if include_children:
+            for child_org in self.child_organizations:
+                departments.extend(child_org.get_all_departments(include_children=True))
+        
+        return departments
+    
+    def get_total_user_count(self, include_children: bool = False) -> int:
+        """Get total user count across all departments"""
+        count = 0
+        for dept in self.get_all_departments(include_children):
+            count += dept.get_user_count(include_children=False)
+        return count
+    
+    def get_department_hierarchy_tree(self) -> List[dict]:
+        """Get department hierarchy as nested tree structure"""
+        root_departments = [dept for dept in self.departments if dept.parent_department_id is None]
+        
+        def build_tree(dept: Department) -> dict:
+            return {
+                'id': dept.id,
+                'name': dept.name,
+                'code': dept.code,
+                'department_type': dept.department_type,
+                'location': dept.location,
+                'hierarchy_level': dept.hierarchy_level,
+                'user_count': dept.get_user_count(),
+                'department_head': {
+                    'id': dept.department_head.id,
+                    'full_name': dept.department_head.full_name,
+                    'job_title': dept.department_head.job_title
+                } if dept.department_head else None,
+                'children': [build_tree(child) for child in dept.child_departments]
+            }
+        
+        return [build_tree(dept) for dept in root_departments]

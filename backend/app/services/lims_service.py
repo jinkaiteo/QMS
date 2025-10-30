@@ -38,7 +38,7 @@ class LIMSService:
     def __init__(self, db: Session, current_user: User):
         self.db = db
         self.current_user = current_user
-        self.audit_service = AuditService(db, current_user)
+        self.audit_service = AuditService()
         self.quality_event_service = QualityEventService(db, current_user)
         self.training_service = TrainingService(db, current_user)
 

@@ -30,6 +30,7 @@ class UserPreference(BaseModel):
 class UserSession(BaseModel):
     """User login sessions for activity tracking"""
     __tablename__ = "user_sessions"
+    __table_args__ = {'extend_existing': True}
     
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     session_token = Column(String(255), unique=True, nullable=False)
