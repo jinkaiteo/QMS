@@ -14,7 +14,7 @@ interface AuthState {
 
 const initialState: AuthState = {
   user: null,
-  token: localStorage.getItem('qms_token'),
+  token: localStorage.getItem('qms_token') || null,
   refreshToken: localStorage.getItem('qms_refresh_token'),
   isAuthenticated: !!localStorage.getItem('qms_token'),
   isLoading: false,
@@ -154,7 +154,7 @@ const authSlice = createSlice({
         // Store in localStorage
         localStorage.setItem('qms_token', action.payload.access_token)
         if (action.payload.refresh_token) {
-          localStorage.setItem('qms_refresh_token', action.payload.refresh_token)
+          localStorage.setItem('qms_refresh_token', action.payload.refresh_token || '')
         }
         console.log('Redux: Tokens stored in localStorage')
       })

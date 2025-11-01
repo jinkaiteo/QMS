@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider, CssBaseline, Box } from '@mui/material'
 import { Provider } from 'react-redux'
 import { store } from './store/store-simple'
@@ -28,38 +28,36 @@ const AppContent: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth)
 
   return (
-    <Router>
-      <Routes>
-        <Route 
-          path="/login" 
-          element={
-            user ? <Navigate to="/dashboard" replace /> : <LoginPage />
-          } 
-        />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <DashboardPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/training"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <DashboardPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
-    </Router>
+    <Routes>
+      <Route 
+        path="/login" 
+        element={
+          user ? <Navigate to="/dashboard" replace /> : <LoginPage />
+        } 
+      />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <DashboardPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/training"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <DashboardPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
   )
 }
 

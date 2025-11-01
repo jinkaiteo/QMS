@@ -24,7 +24,7 @@ class DocumentService:
     
     def __init__(self, db: Session):
         self.db = db
-        self.audit_logger = get_logger()
+        self.audit_logger = get_logger("document_service")
         self.storage_path = Path(settings.DOCUMENT_STORAGE_PATH)
         self.storage_path.mkdir(parents=True, exist_ok=True)
     
@@ -186,8 +186,69 @@ class DocumentService:
             .limit(per_page)\
             .all()
         
+        # Convert to DocumentList format to match schema expectations
+        items = []
+        for doc in documents:
+            # Force load all relationships while session is active
+            doc_type = doc.document_type
+            category = doc.category if doc.category_id else None
+            author = doc.author if hasattr(doc, 'author') else None
+            
+            # Create DocumentList-compatible dict
+            item = {
+                "id": doc.id,
+                "uuid": str(doc.uuid) if hasattr(doc, 'uuid') and doc.uuid else None,
+                "document_number": doc.document_number,
+                "title": doc.title,
+                "status": doc.status,
+                "current_version": doc.current_version,
+                "effective_date": None,  # Not available in simple model
+                "created_at": doc.created_at.isoformat() if doc.created_at else None,
+                "updated_at": doc.updated_at.isoformat() if doc.updated_at else None,
+                "tags": getattr(doc, 'tags', []) or [],
+                # Required relationship objects
+                "document_type": {
+                    "id": doc_type.id,
+                    "uuid": str(doc_type.uuid),
+                    "name": doc_type.name,
+                    "code": getattr(doc_type, 'code', ''),
+                    "prefix": getattr(doc_type, 'prefix', ''),
+                    "description": doc_type.description,
+                    "is_controlled": getattr(doc_type, 'is_controlled', True),
+                    "retention_period_years": getattr(doc_type, 'retention_period_years', 7),
+                    "is_active": getattr(doc_type, 'is_active', True),
+                    "created_at": doc_type.created_at.isoformat(),
+                    "updated_at": doc_type.updated_at.isoformat()
+                } if doc_type else None,
+                "category": {
+                    "id": category.id,
+                    "uuid": str(category.uuid),
+                    "name": category.name,
+                    "code": getattr(category, 'code', ''),
+                    "parent_id": getattr(category, 'parent_id', None),
+                    "description": category.description,
+                    "color": getattr(category, 'color', None),
+                    "icon": getattr(category, 'icon', None),
+                    "is_active": getattr(category, 'is_active', True),
+                    "created_at": category.created_at.isoformat(),
+                    "updated_at": category.updated_at.isoformat()
+                } if category else None,
+                "author": {
+                    "id": author.id,
+                    "username": author.username,
+                    "full_name": getattr(author, 'full_name', f"{getattr(author, 'first_name', '')} {getattr(author, 'last_name', '')}").strip(),
+                    "email": author.email
+                } if author else {
+                    "id": doc.author_id,
+                    "username": "unknown",
+                    "full_name": "Unknown User",
+                    "email": "unknown@example.com"
+                }
+            }
+            items.append(item)
+        
         return {
-            "items": documents,
+            "items": items,
             "total": total,
             "page": page,
             "per_page": per_page,

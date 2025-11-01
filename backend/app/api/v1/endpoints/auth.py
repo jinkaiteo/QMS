@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from datetime import datetime
-import jwt
+from jose import jwt
 
 from app.core.database import get_db
 from app.core.security import token_manager, security_utils, audit_logger

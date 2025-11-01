@@ -177,7 +177,7 @@ async def search_documents(
     return result
 
 
-@router.get("/", response_model=DocumentSearchResponse)
+@router.get("/")
 async def get_documents(
     query: Optional[str] = None,
     document_type_id: Optional[int] = None,
@@ -202,6 +202,39 @@ async def get_documents(
     )
     
     return await search_documents(search_request, db, current_user)
+
+
+@router.get("/stats")
+async def get_document_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get document statistics for dashboard"""
+    try:
+        # Get document counts by status
+        stats_query = db.query(Document).filter(Document.is_deleted == False)
+        
+        total = stats_query.count()
+        approved = stats_query.filter(Document.status == 'approved').count()
+        draft = stats_query.filter(Document.status == 'draft').count()
+        under_review = stats_query.filter(Document.status.in_(['under_review', 'pending_review'])).count()
+        expired = stats_query.filter(Document.status.in_(['expired', 'retired'])).count()
+        
+        return {
+            "total": total,
+            "approved": approved,
+            "pending_review": under_review,
+            "draft": draft,
+            "expired": expired
+        }
+        
+    except Exception as e:
+        logger = logger if 'logger' in locals() else print
+        if hasattr(logger, 'error'):
+            logger.error(f"Error retrieving document stats: {str(e)}")
+        else:
+            print(f"Error retrieving document stats: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve document statistics")
 
 
 @router.get("/{document_id}", response_model=DocumentSchema)

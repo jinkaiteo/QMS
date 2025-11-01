@@ -1,93 +1,61 @@
-import { configureStore, createSlice, PayloadAction } from '@reduxjs/toolkit'
+import { configureStore, createSlice } from '@reduxjs/toolkit'
+import uiSlice from './slices/uiSlice'
 
-// Simple auth state
-interface AuthState {
-  isAuthenticated: boolean
-  user: any | null
-  token: string | null
-  loading: boolean
-}
-
-const initialAuthState: AuthState = {
-  isAuthenticated: !!localStorage.getItem('qms_token'),
-  user: null,
-  token: localStorage.getItem('qms_token'),
-  loading: false,
-}
-
-// Simple auth slice
+// Create auth slice directly here to avoid circular dependency
 const authSlice = createSlice({
   name: 'auth',
-  initialState: initialAuthState,
+  initialState: {
+    user: null,
+    token: null,
+    isAuthenticated: false,
+    hasToken: false,
+    loading: false,
+    error: null
+  },
   reducers: {
     loginStart: (state) => {
       state.loading = true
+      state.error = null
     },
-    loginSuccess: (state, action: PayloadAction<{ user: any; token: string }>) => {
-      state.isAuthenticated = true
+    loginSuccess: (state, action) => {
+      state.loading = false
       state.user = action.payload.user
       state.token = action.payload.token
-      state.loading = false
-      localStorage.setItem('qms_token', action.payload.token)
+      state.isAuthenticated = true
+      state.hasToken = true
+      localStorage.setItem('auth_token', action.payload.token)
     },
-    loginFailure: (state) => {
+    loginFailure: (state, action) => {
       state.loading = false
+      state.error = action.payload
       state.isAuthenticated = false
+      state.hasToken = false
     },
-    logout: (state) => {
-      state.isAuthenticated = false
+    clearAuth: (state) => {
       state.user = null
       state.token = null
-      state.loading = false
-      localStorage.removeItem('qms_token')
-    },
-  },
+      state.isAuthenticated = false
+      state.hasToken = false
+      localStorage.removeItem('auth_token')
+    }
+  }
 })
 
-// Simple UI state
-interface UIState {
-  sidebarOpen: boolean
-  loading: boolean
-  pageTitle: string
-}
+export const { loginStart, loginSuccess, loginFailure, clearAuth } = authSlice.actions
 
-const initialUIState: UIState = {
-  sidebarOpen: true,
-  loading: false,
-  pageTitle: 'QMS Platform',
-}
-
-const uiSlice = createSlice({
-  name: 'ui',
-  initialState: initialUIState,
-  reducers: {
-    toggleSidebar: (state) => {
-      state.sidebarOpen = !state.sidebarOpen
-    },
-    setLoading: (state, action: PayloadAction<boolean>) => {
-      state.loading = action.payload
-    },
-    setPageTitle: (state, action: PayloadAction<string>) => {
-      state.pageTitle = action.payload
-      document.title = `${action.payload} - QMS Platform v3.0`
-    },
-  },
-})
-
-// Create store
 export const store = configureStore({
   reducer: {
     auth: authSlice.reducer,
     ui: uiSlice.reducer,
   },
-  devTools: process.env.NODE_ENV !== 'production',
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: {
+        ignoredActions: ['persist/PERSIST'],
+      },
+    }),
 })
 
-// Export actions
-export const { loginStart, loginSuccess, loginFailure, logout } = authSlice.actions
-export const { toggleSidebar, setLoading, setPageTitle } = uiSlice.actions
-
-// Export types
 export type RootState = ReturnType<typeof store.getState>
 export type AppDispatch = typeof store.dispatch
 

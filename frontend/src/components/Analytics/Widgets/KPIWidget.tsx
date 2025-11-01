@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Chip, IconButton, Skeleton, LinearProgress } from '@mui/material';
-import { TrendingUp, TrendingDown, TrendingFlat, Info, Target } from '@mui/icons-material';
+import { TrendingUp, TrendingDown, TrendingFlat, Info, TrackChanges as Target } from '@mui/icons-material';
 
 interface KPIData {
   value: number;

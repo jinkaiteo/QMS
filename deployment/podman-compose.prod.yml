@@ -85,9 +85,9 @@ services:
     environment:
       ENVIRONMENT: production
       POSTGRES_SERVER: qms-db-prod
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: qms_prod
+      POSTGRES_USER: qms_user
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       REDIS_URL: redis://:${REDIS_PASSWORD}@qms-redis-prod:6379/0
       SECRET_KEY: ${SECRET_KEY}

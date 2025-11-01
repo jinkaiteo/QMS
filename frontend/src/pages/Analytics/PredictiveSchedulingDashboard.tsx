@@ -32,10 +32,10 @@ import {
   Schedule as ScheduleIcon,
   TrendingUp as TrendingUpIcon,
   Insights as InsightsIcon,
-  OptimizeIcon,
-  FeedbackIcon,
-  ModelTrainingIcon,
-  PredictionsIcon
+  Settings as OptimizeIcon,
+  Feedback as FeedbackIcon,
+  ModelTraining as ModelTrainingIcon,
+  Analytics as PredictionsIcon
 } from '@mui/icons-material';
 import {
   LineChart,

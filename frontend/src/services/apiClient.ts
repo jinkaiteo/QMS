@@ -13,12 +13,13 @@ class ApiClient {
 
   constructor() {
     this.instance = axios.create({
-      baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+      baseURL: (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000',
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
+      withCredentials: false,
     })
 
     this.setupInterceptors()

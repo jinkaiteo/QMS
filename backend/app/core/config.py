@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
     POSTGRES_DB: str
-    POSTGRES_PORT: str = "5432"
+    POSTGRES_PORT: int = 5432
     
     @computed_field
     @property
@@ -178,6 +178,8 @@ class DevelopmentSettings(Settings):
         "http://127.0.0.1:3001",
         "http://localhost:3002",  # Backup frontend port
         "http://127.0.0.1:3002",
+        "http://localhost:3003",  # Current frontend dev server
+        "http://127.0.0.1:3003",
         "http://localhost:8080",
         "http://127.0.0.1:8080"
     ]

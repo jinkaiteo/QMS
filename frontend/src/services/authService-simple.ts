@@ -3,11 +3,11 @@ import { User, LoginCredentials, AuthResponse, PasswordChangeRequest } from '../
 
 class AuthService {
   private readonly endpoints = {
-    login: '/v1/auth/login',
-    logout: '/v1/auth/logout',
-    refresh: '/v1/auth/refresh',
-    me: '/v1/auth/me',
-    changePassword: '/v1/auth/change-password',
+    login: '/api/v1/auth/login',
+    logout: '/api/v1/auth/logout',
+    refresh: '/api/v1/auth/refresh',
+    me: '/api/v1/auth/me',
+    changePassword: '/api/v1/auth/change-password',
   }
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {

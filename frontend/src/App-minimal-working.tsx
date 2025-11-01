@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
 import { 
   Box, 
   Container, 
@@ -16,19 +15,16 @@ import {
   IconButton
 } from '@mui/material'
 import { Menu as MenuIcon } from '@mui/icons-material'
-import { RootState } from './store/store'
-import { loginStart, loginSuccess, loginFailure, clearAuth } from './store/store'
 import Sidebar from './components/Layout/Sidebar-Working'
 import EnhancedDashboard from './components/Dashboard/EnhancedDashboard'
-import DocumentsPage from './pages/Documents/DocumentsPage'
+import DocumentsPage from './pages/Documents/DocumentsPage-Functional'
 import TrainingPage from './pages/Training/TrainingPage-Functional'
 import QualityPage from './pages/Quality/QualityPage-Functional'
 import LIMSPage from './pages/LIMS/LIMSPage-Functional'
 import AdvancedReporting from './components/Analytics/AdvancedReporting'
 import { NotificationProvider, NotificationBell, useNotifications } from './components/Common/NotificationSystem'
 
-const LoginForm: React.FC = () => {
-  const dispatch = useDispatch()
+const LoginForm: React.FC<{ onLogin: (user: any) => void }> = ({ onLogin }) => {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -39,8 +35,6 @@ const LoginForm: React.FC = () => {
     setError('')
     setLoading(true)
 
-    dispatch(loginStart())
-
     try {
       const response = await fetch('/api/v1/auth/login', {
         method: 'POST',
@@ -50,17 +44,11 @@ const LoginForm: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json()
-        dispatch(loginSuccess({
-          user: { username, email: data.email || `${username}@qms.com` },
-          token: data.access_token
-        }))
-        console.log('Login successful!')
+        onLogin({ username, token: data.access_token })
       } else {
-        dispatch(loginFailure('Invalid credentials'))
         setError('Invalid credentials')
       }
     } catch (err) {
-      dispatch(loginFailure('Login failed. Please try again.'))
       setError('Login failed. Please try again.')
     } finally {
       setLoading(false)
@@ -205,20 +193,23 @@ const Dashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, onLogo
 }
 
 const App: React.FC = () => {
-  const dispatch = useDispatch()
-  const { user, isAuthenticated } = useSelector((state: RootState) => state.auth)
+  const [user, setUser] = useState<any>(null)
+
+  const handleLogin = (userData: any) => {
+    setUser(userData)
+  }
 
   const handleLogout = () => {
-    dispatch(clearAuth())
+    setUser(null)
   }
 
   return (
     <NotificationProvider>
       <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5' }}>
-        {isAuthenticated && user ? (
+        {user ? (
           <Dashboard user={user} onLogout={handleLogout} />
         ) : (
-          <LoginForm />
+          <LoginForm onLogin={handleLogin} />
         )}
       </Box>
     </NotificationProvider>

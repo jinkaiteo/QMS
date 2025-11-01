@@ -1,293 +1,136 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
 import {
   Box,
-  Paper,
+  Card,
+  CardContent,
   TextField,
   Button,
   Typography,
   Alert,
-  CircularProgress,
-  FormControlLabel,
-  Checkbox,
-  Divider,
-  Link,
-  IconButton,
+  Container,
+  Paper,
 } from '@mui/material'
-import { Lock, Person, Visibility, VisibilityOff } from '@mui/icons-material'
-import { useForm, Controller } from 'react-hook-form'
-import { yupResolver } from '@hookform/resolvers/yup'
-import * as yup from 'yup'
-import { useDispatch, useSelector } from 'react-redux'
-import { useNavigate } from 'react-router-dom'
-
-import { RootState, loginStart, loginSuccess, loginFailure } from '@store/store'
-import { addNotification } from '@store/slices/uiSlice'
-import { authService } from '@services/authService'
-import { LoginCredentials } from '@types/auth'
-
-const loginSchema = yup.object({
-  username: yup
-    .string()
-    .required('Username is required')
-    .min(3, 'Username must be at least 3 characters'),
-  password: yup
-    .string()
-    .required('Password is required')
-    .min(6, 'Password must be at least 6 characters'),
-  remember_me: yup.boolean(),
-})
+import { AppDispatch } from '../../store/store-simple'
+import { loginUser } from '../../store/slices/authSlice-simple'
 
 const LoginPage: React.FC = () => {
-  const dispatch = useDispatch()
-  const navigate = useNavigate()
-  const { isLoading, error } = useSelector((state: RootState) => state.auth)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   
-  const [showPassword, setShowPassword] = useState(false)
+  const dispatch = useDispatch<AppDispatch>()
+  const navigate = useNavigate()
 
-  const {
-    control,
-    handleSubmit,
-    formState: { errors },
-    setError,
-  } = useForm<LoginCredentials>({
-    resolver: yupResolver(loginSchema),
-    defaultValues: {
-      username: '',
-      password: '',
-      remember_me: false,
-    },
-  })
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
 
-  const onSubmit = async (data: LoginCredentials) => {
     try {
-      console.log('Starting login with data:', data)
-      dispatch(loginStart())
+      const result = await dispatch(loginUser({ username, password }))
       
-      // Call auth service directly
-      const response = await authService.login(data)
-      console.log('Auth service response:', response)
-      
-      // Dispatch success action to simple store
-      dispatch(loginSuccess({
-        user: response.user,
-        token: response.access_token
-      }))
-      
-      const userName = response.user?.full_name || response.user?.username || 'User'
-      
-      dispatch(addNotification({
-        type: 'success',
-        title: 'Login Successful',
-        message: `Welcome back, ${userName}!`,
-      }))
-      
-      console.log('Login successful, navigating to dashboard')
-      navigate('/dashboard')
-      
-    } catch (error: any) {
-      console.error('Login error:', error)
-      dispatch(loginFailure())
-      
-      const errorMessage = error.message || 'Login failed'
-      setError('root', { message: errorMessage })
-      
-      dispatch(addNotification({
-        type: 'error',
-        title: 'Login Failed',
-        message: errorMessage,
-      }))
+      if (loginUser.fulfilled.match(result)) {
+        navigate('/dashboard')
+      } else {
+        setError(result.payload as string || 'Login failed')
+      }
+    } catch (err) {
+      setError('Login failed. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleTogglePasswordVisibility = () => {
-    setShowPassword(!showPassword)
-  }
-
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'background.default',
-        backgroundImage: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        padding: 3,
-      }}
-    >
-      <Paper
-        elevation={8}
+    <Container maxWidth="sm">
+      <Box
         sx={{
-          padding: 4,
-          width: '100%',
-          maxWidth: 400,
-          borderRadius: 2,
-          backgroundColor: 'background.paper',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          py: 3,
         }}
       >
-        {/* Header */}
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
-          <Box
-            sx={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 60,
-              height: 60,
-              borderRadius: '50%',
-              backgroundColor: 'primary.main',
-              mb: 2,
-            }}
-          >
-            <Lock sx={{ fontSize: 30, color: 'white' }} />
+        <Paper elevation={6} sx={{ p: 4, width: '100%', maxWidth: 400 }}>
+          <Box sx={{ mb: 4, textAlign: 'center' }}>
+            <Typography variant="h4" component="h1" gutterBottom color="primary">
+              QMS Platform
+            </Typography>
+            <Typography variant="subtitle1" color="text.secondary">
+              Pharmaceutical Quality Management System v3.0
+            </Typography>
           </Box>
-          <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-            QMS Platform
-          </Typography>
-          <Typography variant="body1" color="textSecondary">
-            Pharmaceutical Quality Management System
-          </Typography>
-          <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>
-            21 CFR Part 11 Compliant • Version 3.0
-          </Typography>
-        </Box>
 
-        {/* Error Alert */}
-        {(error || errors.root) && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error || errors.root?.message}
-          </Alert>
-        )}
+          <Card>
+            <CardContent>
+              <Typography variant="h5" component="h2" gutterBottom align="center">
+                Sign In
+              </Typography>
 
-        {/* Login Form */}
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <Box sx={{ mb: 3 }}>
-            <Controller
-              name="username"
-              control={control}
-              render={({ field }) => (
+              {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {error}
+                </Alert>
+              )}
+
+              <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
                 <TextField
-                  {...field}
                   fullWidth
                   label="Username"
-                  variant="outlined"
-                  error={!!errors.username}
-                  helperText={errors.username?.message}
-                  InputProps={{
-                    startAdornment: <Person sx={{ mr: 1, color: 'action.active' }} />,
-                  }}
-                  autoComplete="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  margin="normal"
+                  required
                   autoFocus
+                  autoComplete="username"
                 />
-              )}
-            />
-          </Box>
-
-          <Box sx={{ mb: 3 }}>
-            <Controller
-              name="password"
-              control={control}
-              render={({ field }) => (
+                
                 <TextField
-                  {...field}
                   fullWidth
                   label="Password"
-                  type={showPassword ? 'text' : 'password'}
-                  variant="outlined"
-                  error={!!errors.password}
-                  helperText={errors.password?.message}
-                  InputProps={{
-                    startAdornment: <Lock sx={{ mr: 1, color: 'action.active' }} />,
-                    endAdornment: (
-                      <IconButton
-                        onClick={handleTogglePasswordVisibility}
-                        edge="end"
-                        aria-label="toggle password visibility"
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    ),
-                  }}
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  margin="normal"
+                  required
                   autoComplete="current-password"
                 />
-              )}
-            />
-          </Box>
 
-          <Box sx={{ mb: 3 }}>
-            <Controller
-              name="remember_me"
-              control={control}
-              render={({ field }) => (
-                <FormControlLabel
-                  control={<Checkbox {...field} checked={field.value} />}
-                  label="Remember me"
-                />
-              )}
-            />
-          </Box>
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="contained"
+                  size="large"
+                  disabled={loading}
+                  sx={{ mt: 3, mb: 2 }}
+                >
+                  {loading ? 'Signing In...' : 'Sign In'}
+                </Button>
+              </Box>
 
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            size="large"
-            disabled={isLoading}
-            sx={{
-              mb: 3,
-              height: 48,
-              fontSize: '1rem',
-              fontWeight: 600,
-            }}
-          >
-            {isLoading ? (
-              <CircularProgress size={24} color="inherit" />
-            ) : (
-              'Sign In'
-            )}
-          </Button>
-        </form>
+              <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Typography variant="body2" color="text.secondary" align="center">
+                  <strong>Demo Credentials:</strong><br />
+                  Username: admin<br />
+                  Password: admin123
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
 
-        <Divider sx={{ mb: 3 }} />
-
-        {/* Footer Links */}
-        <Box sx={{ textAlign: 'center' }}>
-          <Link
-            href="#"
-            variant="body2"
-            sx={{ display: 'block', mb: 1 }}
-            onClick={(e) => {
-              e.preventDefault()
-              dispatch(addNotification({
-                type: 'info',
-                title: 'Password Reset',
-                message: 'Please contact your system administrator for password reset.',
-              }))
-            }}
-          >
-            Forgot password?
-          </Link>
-          <Typography variant="caption" color="textSecondary">
-            Need help? Contact your system administrator
-          </Typography>
-        </Box>
-
-        {/* Demo Credentials (Development only) */}
-        {process.env.NODE_ENV === 'development' && (
-          <Box sx={{ mt: 3, p: 2, backgroundColor: 'info.main', borderRadius: 1 }}>
-            <Typography variant="caption" sx={{ color: 'info.contrastText', display: 'block', mb: 1 }}>
-              Demo Credentials:
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'info.contrastText', display: 'block' }}>
-              Username: admin / Password: admin123
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'info.contrastText', display: 'block' }}>
-              Username: user / Password: user123
+          <Box sx={{ mt: 2, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              © 2024 QMS Platform v3.0 - Pharmaceutical Quality Management
             </Typography>
           </Box>
-        )}
-      </Paper>
-    </Box>
+        </Paper>
+      </Box>
+    </Container>
   )
 }
 

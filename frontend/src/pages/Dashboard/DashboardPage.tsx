@@ -1,282 +1,314 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
+import { useSelector } from 'react-redux'
 import {
   Box,
   Grid,
-  Paper,
-  Typography,
   Card,
   CardContent,
-  CardActions,
+  Typography,
   Button,
+  Alert,
+  CircularProgress,
   Chip,
-  LinearProgress,
-  IconButton,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
 } from '@mui/material'
 import {
-  Dashboard,
-  TrendingUp,
-  Warning,
-  CheckCircle,
-  Assignment,
-  Science,
-  School,
-  People,
-  Refresh,
-  ArrowForward,
+  School as TrainingIcon,
+  Assignment as AssignmentIcon,
+  CheckCircle as CompleteIcon,
+  Schedule as PendingIcon,
 } from '@mui/icons-material'
-import { useDispatch, useSelector } from 'react-redux'
-import { useNavigate } from 'react-router-dom'
+import { RootState } from '../../store/store-simple'
+import { apiClient } from '../../services/apiClient-simple'
 
-import { RootState } from '@store/store'
-import { setPageTitle, setBreadcrumbs } from '@store/slices/uiSlice'
-import { authService } from '@services/authService'
+interface TrainingAssignment {
+  id: number
+  program_id: number
+  employee_id: number
+  status: string
+  progress: number
+  score?: number
+  due_date: string
+  created_at: string
+}
+
+interface TrainingProgram {
+  id: number
+  title: string
+  type: string
+  duration: number
+  status: string
+  description?: string
+}
 
 const DashboardPage: React.FC = () => {
-  console.log('DashboardPage component rendering')
-  const dispatch = useDispatch()
-  const navigate = useNavigate()
   const { user } = useSelector((state: RootState) => state.auth)
+  const [assignments, setAssignments] = useState<TrainingAssignment[]>([])
+  const [programs, setPrograms] = useState<TrainingProgram[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    dispatch(setPageTitle('Dashboard'))
-    dispatch(setBreadcrumbs([
-      { label: 'Dashboard' }
-    ]))
-  }, [dispatch])
+    loadDashboardData()
+  }, [])
 
-  const userDisplayName = authService.getUserDisplayName(user)
-
-  // Mock dashboard data (in a real app, this would come from API)
-  const dashboardStats = {
-    documents: { total: 1247, pending: 23, approved: 1198, rejected: 26 },
-    samples: { total: 89, inTesting: 34, completed: 45, released: 10 },
-    training: { total: 156, overdue: 8, expiring: 12, completed: 136 },
-    quality: { total: 45, open: 12, investigating: 8, closed: 25 },
-  }
-
-  const recentActivities = [
-    { id: 1, type: 'document', action: 'Document "SOP-001" approved', time: '2 hours ago' },
-    { id: 2, type: 'sample', action: 'Sample "S-2024-001" completed testing', time: '4 hours ago' },
-    { id: 3, type: 'training', action: 'Training "GMP Basics" assigned to John Doe', time: '1 day ago' },
-    { id: 4, type: 'quality', action: 'CAPA "C-2024-005" effectiveness verified', time: '2 days ago' },
-  ]
-
-  const quickActions = [
-    { label: 'Manage Documents', icon: <Assignment />, path: '/documents', permission: 'documents.view' },
-    { label: 'LIMS Dashboard', icon: <Science />, path: '/lims', permission: 'lims.view' },
-    { label: 'Training Management', icon: <School />, path: '/training', permission: 'training.view' },
-    { label: 'Quality Management', icon: <Warning />, path: '/quality', permission: 'quality.view' },
-  ]
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'approved':
-      case 'completed':
-      case 'released':
-      case 'closed':
-        return 'success'
-      case 'pending':
-      case 'in_testing':
-      case 'investigating':
-        return 'warning'
-      case 'rejected':
-      case 'overdue':
-      case 'open':
-        return 'error'
-      default:
-        return 'default'
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true)
+      
+      // Load training assignments
+      const assignmentsResponse = await apiClient.get<TrainingAssignment[]>('/v1/training/assignments')
+      setAssignments(assignmentsResponse.data)
+      
+      // Load training programs
+      const programsResponse = await apiClient.get<TrainingProgram[]>('/v1/training/programs')
+      setPrograms(programsResponse.data)
+      
+    } catch (err: any) {
+      setError('Failed to load dashboard data')
+      console.error('Dashboard error:', err)
+    } finally {
+      setLoading(false)
     }
   }
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'success'
+      case 'in_progress': return 'primary'
+      case 'assigned': return 'warning'
+      case 'overdue': return 'error'
+      default: return 'default'
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed': return <CompleteIcon />
+      case 'in_progress': return <PendingIcon />
+      case 'assigned': return <AssignmentIcon />
+      default: return <AssignmentIcon />
+    }
+  }
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+        <CircularProgress size={60} />
+      </Box>
+    )
+  }
+
   return (
-    <Box>
+    <Box sx={{ p: 3 }}>
       {/* Welcome Header */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-          Welcome back, {userDisplayName}
+        <Typography variant="h4" gutterBottom>
+          Welcome back, {user?.first_name || user?.username}!
         </Typography>
-        <Typography variant="body1" color="textSecondary">
-          Here's what's happening in your QMS platform today.
+        <Typography variant="subtitle1" color="text.secondary">
+          QMS Platform Dashboard - Training & Compliance Overview
         </Typography>
       </Box>
 
-      {/* Dashboard Stats */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* Statistics Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {/* Documents */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ height: '100%' }}>
+          <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Assignment sx={{ color: 'primary.main', mr: 1 }} />
-                <Typography variant="h6">Documents</Typography>
-              </Box>
-              <Typography variant="h4" sx={{ mb: 1, fontWeight: 600 }}>
-                {dashboardStats.documents.total}
-              </Typography>
-              <Box sx={{ mb: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2">Pending: {dashboardStats.documents.pending}</Typography>
-                  <Typography variant="body2">Approved: {dashboardStats.documents.approved}</Typography>
+              <Box display="flex" alignItems="center">
+                <TrainingIcon color="primary" sx={{ mr: 2, fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" color="primary">
+                    {programs.length}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Training Programs
+                  </Typography>
                 </Box>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={(dashboardStats.documents.approved / dashboardStats.documents.total) * 100}
-                  sx={{ height: 6, borderRadius: 3 }}
-                />
               </Box>
             </CardContent>
-            <CardActions>
-              <Button size="small" onClick={() => navigate('/documents')}>
-                View All <ArrowForward sx={{ ml: 1, fontSize: 16 }} />
-              </Button>
-            </CardActions>
           </Card>
         </Grid>
 
-        {/* Samples */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ height: '100%' }}>
+          <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Science sx={{ color: 'info.main', mr: 1 }} />
-                <Typography variant="h6">LIMS Samples</Typography>
-              </Box>
-              <Typography variant="h4" sx={{ mb: 1, fontWeight: 600 }}>
-                {dashboardStats.samples.total}
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip label={`Testing: ${dashboardStats.samples.inTesting}`} size="small" color="warning" />
-                <Chip label={`Released: ${dashboardStats.samples.released}`} size="small" color="success" />
+              <Box display="flex" alignItems="center">
+                <AssignmentIcon color="info" sx={{ mr: 2, fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" color="info.main">
+                    {assignments.length}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    My Assignments
+                  </Typography>
+                </Box>
               </Box>
             </CardContent>
-            <CardActions>
-              <Button size="small" onClick={() => navigate('/lims')}>
-                View LIMS <ArrowForward sx={{ ml: 1, fontSize: 16 }} />
-              </Button>
-            </CardActions>
           </Card>
         </Grid>
 
-        {/* Training */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ height: '100%' }}>
+          <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <School sx={{ color: 'success.main', mr: 1 }} />
-                <Typography variant="h6">Training</Typography>
-              </Box>
-              <Typography variant="h4" sx={{ mb: 1, fontWeight: 600 }}>
-                {dashboardStats.training.total}
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip label={`Overdue: ${dashboardStats.training.overdue}`} size="small" color="error" />
-                <Chip label={`Expiring: ${dashboardStats.training.expiring}`} size="small" color="warning" />
+              <Box display="flex" alignItems="center">
+                <CompleteIcon color="success" sx={{ mr: 2, fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" color="success.main">
+                    {assignments.filter(a => a.status === 'completed').length}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Completed
+                  </Typography>
+                </Box>
               </Box>
             </CardContent>
-            <CardActions>
-              <Button size="small" onClick={() => navigate('/training')}>
-                View Training <ArrowForward sx={{ ml: 1, fontSize: 16 }} />
-              </Button>
-            </CardActions>
           </Card>
         </Grid>
 
-        {/* Quality Events */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ height: '100%' }}>
+          <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Warning sx={{ color: 'warning.main', mr: 1 }} />
-                <Typography variant="h6">Quality Events</Typography>
-              </Box>
-              <Typography variant="h4" sx={{ mb: 1, fontWeight: 600 }}>
-                {dashboardStats.quality.total}
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip label={`Open: ${dashboardStats.quality.open}`} size="small" color="error" />
-                <Chip label={`Investigating: ${dashboardStats.quality.investigating}`} size="small" color="warning" />
+              <Box display="flex" alignItems="center">
+                <PendingIcon color="warning" sx={{ mr: 2, fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" color="warning.main">
+                    {assignments.filter(a => a.status === 'assigned' || a.status === 'in_progress').length}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Pending
+                  </Typography>
+                </Box>
               </Box>
             </CardContent>
-            <CardActions>
-              <Button size="small" onClick={() => navigate('/quality')}>
-                View Quality <ArrowForward sx={{ ml: 1, fontSize: 16 }} />
-              </Button>
-            </CardActions>
           </Card>
         </Grid>
       </Grid>
 
+      {/* Training Assignments */}
       <Grid container spacing={3}>
-        {/* Quick Actions */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, height: '100%' }}>
-            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-              <TrendingUp sx={{ mr: 1 }} />
-              Quick Actions
-            </Typography>
-            <Grid container spacing={2}>
-              {quickActions
-                .filter(action => !action.permission || authService.hasPermission(user, action.permission))
-                .map((action, index) => (
-                <Grid item xs={12} sm={6} key={index}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    startIcon={action.icon}
-                    onClick={() => navigate(action.path)}
-                    sx={{ 
-                      py: 2,
-                      justifyContent: 'flex-start',
-                      textAlign: 'left',
-                    }}
-                  >
-                    {action.label}
-                  </Button>
-                </Grid>
-              ))}
-            </Grid>
-          </Paper>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                My Training Assignments
+              </Typography>
+              
+              {assignments.length === 0 ? (
+                <Typography color="text.secondary">
+                  No training assignments found.
+                </Typography>
+              ) : (
+                <List>
+                  {assignments.map((assignment) => {
+                    const program = programs.find(p => p.id === assignment.program_id)
+                    return (
+                      <ListItem key={assignment.id} divider>
+                        <ListItemIcon>
+                          {getStatusIcon(assignment.status)}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={program?.title || `Program ${assignment.program_id}`}
+                          secondary={
+                            <Box>
+                              <Typography variant="body2" color="text.secondary">
+                                Progress: {assignment.progress}% | Due: {new Date(assignment.due_date).toLocaleDateString()}
+                              </Typography>
+                              {assignment.score && (
+                                <Typography variant="body2" color="text.secondary">
+                                  Score: {assignment.score}%
+                                </Typography>
+                              )}
+                            </Box>
+                          }
+                        />
+                        <Chip
+                          label={assignment.status.replace('_', ' ').toUpperCase()}
+                          color={getStatusColor(assignment.status) as any}
+                          size="small"
+                        />
+                      </ListItem>
+                    )
+                  })}
+                </List>
+              )}
+            </CardContent>
+          </Card>
         </Grid>
 
-        {/* Recent Activities */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, height: '100%' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
-                <Dashboard sx={{ mr: 1 }} />
-                Recent Activities
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Available Training Programs
               </Typography>
-              <IconButton size="small">
-                <Refresh />
-              </IconButton>
-            </Box>
-            <Box>
-              {recentActivities.map((activity) => (
-                <Box
-                  key={activity.id}
-                  sx={{
-                    p: 2,
-                    mb: 1,
-                    border: 1,
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    '&:hover': {
-                      backgroundColor: 'action.hover',
-                    },
-                  }}
-                >
-                  <Typography variant="body2" sx={{ mb: 0.5 }}>
-                    {activity.action}
-                  </Typography>
-                  <Typography variant="caption" color="textSecondary">
-                    {activity.time}
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
-          </Paper>
+              
+              {programs.length === 0 ? (
+                <Typography color="text.secondary">
+                  No training programs available.
+                </Typography>
+              ) : (
+                <List>
+                  {programs.slice(0, 5).map((program) => (
+                    <ListItem key={program.id} divider>
+                      <ListItemIcon>
+                        <TrainingIcon color="primary" />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={program.title}
+                        secondary={
+                          <Box>
+                            <Typography variant="body2" color="text.secondary">
+                              {program.description || 'No description available'}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Duration: {program.duration} hours | Type: {program.type}
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                      <Chip
+                        label={program.status.toUpperCase()}
+                        color={program.status === 'active' ? 'success' : 'default'}
+                        size="small"
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
+
+      {/* Quick Actions */}
+      <Box sx={{ mt: 4, textAlign: 'center' }}>
+        <Button
+          variant="contained"
+          size="large"
+          onClick={() => window.location.href = '/training'}
+          sx={{ mr: 2 }}
+        >
+          View All Training
+        </Button>
+        <Button
+          variant="outlined"
+          size="large"
+          onClick={loadDashboardData}
+        >
+          Refresh Data
+        </Button>
+      </Box>
     </Box>
   )
 }
