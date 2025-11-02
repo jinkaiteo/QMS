@@ -30,25 +30,12 @@ class FileManagementService:
         self.db = db
         self.bucket_name = getattr(settings, 'MINIO_BUCKET_NAME', 'qms-documents')
         
-        # Initialize MinIO client
-        if MINIO_AVAILABLE:
-            try:
-                self.minio_client = Minio(
-                    endpoint=getattr(settings, 'MINIO_ENDPOINT', 'qms-minio-prod:9000'),
-                    access_key=getattr(settings, 'MINIO_ROOT_USER', 'minio'),
-                    secret_key=getattr(settings, 'MINIO_ROOT_PASSWORD', 'minio123'),
-                    secure=getattr(settings, 'MINIO_SECURE', False)
-                )
-                self._ensure_bucket_exists()
-                self.storage_available = True
-                logger.info("MinIO client initialized successfully")
-            except Exception as e:
-                logger.error(f"Failed to initialize MinIO client: {str(e)}")
-                self.storage_available = False
-        else:
-            logger.warning("MinIO not available - using local file storage")
-            self.storage_available = False
-            self._setup_local_storage()
+        # Always setup local storage as fallback
+        self._setup_local_storage()
+        
+        # For now, disable MinIO and use local storage to avoid transaction issues
+        self.storage_available = False
+        logger.info("Using local file storage (MinIO disabled to avoid transaction conflicts)")
     
     def _ensure_bucket_exists(self):
         """Ensure the documents bucket exists"""
@@ -62,7 +49,9 @@ class FileManagementService:
     
     def _setup_local_storage(self):
         """Setup local file storage as fallback"""
-        self.local_storage_path = Path(getattr(settings, 'LOCAL_STORAGE_PATH', '/tmp/qms_documents'))
+        # Use the DOCUMENT_STORAGE_PATH from settings, with fallback
+        storage_path = getattr(settings, 'DOCUMENT_STORAGE_PATH', './storage/documents')
+        self.local_storage_path = Path(storage_path)
         self.local_storage_path.mkdir(parents=True, exist_ok=True)
         logger.info(f"Local storage setup at: {self.local_storage_path}")
     
@@ -111,11 +100,10 @@ class FileManagementService:
                 'file_path': storage_path,
                 'file_name': filename,
                 'file_size': file_size,
-                'mime_type': mime_type,
-                'checksum': checksum,
-                'uploaded_by_id': user_id,
-                'upload_reason': upload_reason,
-                'is_current': True  # Will trigger database trigger to unset others
+                'file_mime_type': mime_type,
+                'file_hash': checksum,
+                'author_id': user_id,
+                'change_summary': upload_reason
             }
             
             version_id = self._create_document_version(version_data)
@@ -505,19 +493,26 @@ class FileManagementService:
     
     def _create_document_version(self, version_data: Dict[str, Any]) -> int:
         """Create a document version record"""
-        query = text("""
-            INSERT INTO document_versions 
-            (document_id, version_number, major_version, minor_version, file_path, file_name, 
-             file_size, mime_type, checksum, uploaded_by_id, upload_reason, is_current, created_at, updated_at)
-            VALUES (:document_id, :version_number, :major_version, :minor_version, :file_path, :file_name,
-                    :file_size, :mime_type, :checksum, :uploaded_by_id, :upload_reason, :is_current, NOW(), NOW())
-            RETURNING id
-        """)
-        
-        result = self.db.execute(query, version_data)
-        version_id = result.fetchone()[0]
-        self.db.commit()
-        return version_id
+        try:
+            # Rollback any failed transaction first
+            self.db.rollback()
+            
+            query = text("""
+                INSERT INTO document_versions 
+                (document_id, version_number, major_version, minor_version, file_path, file_name, 
+                 file_size, file_hash, file_mime_type, author_id, change_summary)
+                VALUES (:document_id, :version_number, :major_version, :minor_version, :file_path, :file_name,
+                        :file_size, :file_hash, :file_mime_type, :author_id, :change_summary)
+                RETURNING id
+            """)
+            
+            result = self.db.execute(query, version_data)
+            version_id = result.fetchone()[0]
+            self.db.commit()
+            return version_id
+        except Exception as e:
+            self.db.rollback()
+            raise
     
     def _get_version_by_number(self, document_id: int, version_number: str) -> Optional[Dict[str, Any]]:
         """Get version info by version number"""

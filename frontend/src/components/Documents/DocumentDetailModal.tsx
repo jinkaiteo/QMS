@@ -35,6 +35,7 @@ import {
 } from '@mui/icons-material'
 import { Document, documentsService } from '../../services/documentsService'
 import DocumentWorkflowPanel from './DocumentWorkflowPanel'
+import DocumentUpload from './DocumentUpload'
 
 interface DocumentDetailModalProps {
   document: Document | null
@@ -68,6 +69,7 @@ const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
   const [reviewComment, setReviewComment] = useState('')
   const [approvalComment, setApprovalComment] = useState('')
   const [effectiveDate, setEffectiveDate] = useState('')
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
 
   if (!document) return null
 
@@ -328,10 +330,7 @@ const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
                         color="primary"
                         startIcon={<LinkIcon />}
                         fullWidth
-                        onClick={() => {
-                          // TODO: Implement file upload modal or redirect to upload page
-                          alert('File upload functionality will open here. For now, use the main Upload page or API endpoint: POST /api/v1/documents/' + document.id + '/files/upload')
-                        }}
+                        onClick={() => setUploadDialogOpen(true)}
                       >
                         Upload Document File
                       </Button>
@@ -445,6 +444,39 @@ const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
       <DialogActions sx={{ p: 3 }}>
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
+
+      {/* File Upload Dialog */}
+      <Dialog
+        open={uploadDialogOpen}
+        onClose={() => setUploadDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Upload File for {document.title}
+        </DialogTitle>
+        <DialogContent>
+          <DocumentUpload
+            documentId={document.id}
+            onUploadComplete={(result) => {
+              console.log('Upload completed:', result)
+              setUploadDialogOpen(false)
+              // Don't close the detail modal, just refresh the document data
+              if (onDocumentUpdate) {
+                onDocumentUpdate() // Refresh the documents list
+              }
+              // Remove the page reload that was causing logout
+            }}
+            onError={(error) => {
+              console.error('Upload error:', error)
+              alert('Upload failed: ' + error.message)
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setUploadDialogOpen(false)}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   )
 }

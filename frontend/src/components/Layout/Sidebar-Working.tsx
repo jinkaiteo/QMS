@@ -47,10 +47,7 @@ const menuItems: MenuItem[] = [
     id: 'documents',
     label: 'Document Management',
     icon: <Description />,
-    children: [
-      { id: 'documents-list', label: 'All Documents', icon: <Assignment />, path: '/documents' },
-      { id: 'documents-create', label: 'Create Document', icon: <Description />, path: '/documents/create' },
-    ],
+    path: '/documents',
   },
   {
     id: 'lims',
