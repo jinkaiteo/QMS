@@ -456,7 +456,7 @@ async def get_metric_trends(
     metric_name: str = Path(..., description="Metric name"),
     department_id: Optional[int] = Query(None, description="Filter by department"),
     period_days: int = Query(90, ge=7, le=365, description="Analysis period in days"),
-    granularity: str = Query("daily", regex="^(daily|weekly|monthly)$"),
+    granularity: str = Query("daily", pattern="^(daily|weekly|monthly)$"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

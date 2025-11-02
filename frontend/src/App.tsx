@@ -10,9 +10,6 @@ import {
   Alert,
   AppBar,
   Toolbar,
-  Card,
-  CardContent,
-  Grid,
   IconButton
 } from '@mui/material'
 import { Menu as MenuIcon } from '@mui/icons-material'
@@ -25,7 +22,7 @@ import TrainingPage from './pages/Training/TrainingPage-Functional'
 import QualityPage from './pages/Quality/QualityPage-Functional'
 import LIMSPage from './pages/LIMS/LIMSPage-Functional'
 import AdvancedReporting from './components/Analytics/AdvancedReporting'
-import { NotificationProvider, NotificationBell, useNotifications } from './components/Common/NotificationSystem'
+import { NotificationProvider, NotificationBell } from './components/Common/NotificationSystem'
 
 const LoginForm: React.FC = () => {
   const dispatch = useDispatch()

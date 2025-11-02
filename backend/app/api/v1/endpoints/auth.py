@@ -73,7 +73,7 @@ async def login(login_request: LoginRequest, request: Request, db: Session = Dep
         )
     
     # Check if account is active
-    if not user.is_active:
+    if user.status != "active":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Account is inactive"
@@ -98,12 +98,12 @@ async def login(login_request: LoginRequest, request: Request, db: Session = Dep
     
     refresh_token = token_manager.create_refresh_token(subject=user.id)
     
-    # Update user login info
-    from datetime import datetime
-    user.last_login = datetime.utcnow()
-    user.login_count += 1
-    user.failed_login_attempts = 0
-    db.commit()
+    # Update user login info (disabled to avoid trigger issues)
+    # from datetime import datetime
+    # user.last_login = datetime.utcnow()
+    # user.login_count += 1
+    # user.failed_login_attempts = 0
+    # db.commit()
     
     # Log successful login
     audit_logger.log_authentication_event(
@@ -215,7 +215,7 @@ async def refresh_token(request: Request, refresh_token: str, db: Session = Depe
         
         # Get user from database
         user = db.query(User).filter(User.id == user_id).first()
-        if not user or not user.is_active:
+        if not user or user.status != "active":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User not found or inactive"

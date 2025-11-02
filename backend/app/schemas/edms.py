@@ -1,7 +1,7 @@
 # EDMS Schemas - Phase 2
 # Pydantic schemas for EDMS API endpoints
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, field_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
 from enum import Enum
@@ -57,12 +57,13 @@ class DocumentTypeUpdate(BaseModel):
     retention_period_years: Optional[int] = None
 
 
-class DocumentType(DocumentTypeBase):
+class DocumentType(BaseModel):
     id: int
-    uuid: UUID
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
+    name: str
+    # code: str  # Commented out - doesn't exist in database
+    description: Optional[str] = None
+    prefix: Optional[str] = None
+    is_active: bool = True
     
     class Config:
         from_attributes = True
@@ -91,12 +92,13 @@ class DocumentCategoryUpdate(BaseModel):
     icon: Optional[str] = Field(None, max_length=50)
 
 
-class DocumentCategory(DocumentCategoryBase):
+class DocumentCategory(BaseModel):
     id: int
-    uuid: UUID
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
+    name: str
+    # code: str  # Commented out - doesn't exist in database
+    description: Optional[str] = None
+    parent_id: Optional[int] = None
+    is_active: bool = True
     
     class Config:
         from_attributes = True
@@ -114,7 +116,8 @@ class DocumentBase(BaseModel):
 
 
 class DocumentCreate(DocumentBase):
-    pass
+    document_number: Optional[str] = None  # Auto-generated if not provided
+    is_controlled: bool = True
 
 
 class DocumentUpdate(BaseModel):
@@ -165,22 +168,29 @@ class DocumentVersion(BaseModel):
 
 class Document(DocumentBase):
     id: int
-    uuid: str
+    uuid: str  # Will be converted from UUID to string
     document_number: str
-    source_type: str
+    source_type: str = "internal"
     status: DocumentStatusEnum
-    is_template: bool
-    is_controlled: bool
-    next_review_date: Optional[date]
+    is_template: bool = False
+    is_controlled: bool = True
+    next_review_date: Optional[date] = None
     created_at: datetime
     updated_at: datetime
     
-    # Relationships
-    document_type: DocumentType
-    category: Optional[DocumentCategory]
-    author: UserInfo
-    owner: Optional[UserInfo]
-    current_version: Optional[DocumentVersion]
+    # Relationships - made optional to handle cases where they're not loaded
+    document_type: Optional[DocumentType] = None
+    category: Optional[DocumentCategory] = None
+    author: Optional[UserInfo] = None
+    owner: Optional[UserInfo] = None
+    # current_version: Optional[DocumentVersion]  # Commented out - relationship issue
+    
+    @field_validator('uuid', mode='before')
+    @classmethod
+    def validate_uuid(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
     
     class Config:
         from_attributes = True
@@ -195,7 +205,7 @@ class DocumentList(BaseModel):
     document_type: DocumentType
     category: Optional[DocumentCategory]
     author: UserInfo
-    current_version: Optional[str]
+    # current_version: Optional[str]  # Commented out - relationship issue
     effective_date: Optional[date]
     created_at: datetime
     updated_at: datetime

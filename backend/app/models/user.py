@@ -117,11 +117,11 @@ class User(BaseModel):
     # Password history
     password_history = relationship("PasswordHistory", back_populates="user", cascade="all, delete-orphan")
     
-    # EDMS relationships (Phase 2)
-    authored_documents = relationship("Document", foreign_keys="Document.author_id", back_populates="author")
-    owned_documents = relationship("Document", foreign_keys="Document.owner_id", back_populates="owner")
-    digital_signatures = relationship("DigitalSignature", back_populates="signer")
-    document_comments = relationship("DocumentComment", back_populates="user")
+    # EDMS relationships (Phase 2) - commented out to avoid mapping issues
+    # authored_documents = relationship("Document", foreign_keys="Document.author_id", back_populates="author")
+    # owned_documents = relationship("Document", foreign_keys="Document.owner_id", back_populates="owner")
+    # digital_signatures = relationship("DigitalSignature", back_populates="signer")
+    # document_comments = relationship("DocumentComment", back_populates="user")
     
     # Note: QRM and Training relationships will be added after all models are properly imported
     # This avoids forward reference issues in SQLAlchemy

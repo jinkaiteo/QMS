@@ -172,6 +172,70 @@ class DocumentsService {
     return response.data
   }
 
+  // Workflow Management Methods
+  
+  // Start review workflow
+  async startReviewWorkflow(documentId: number, reviewerId: number, dueDate?: string): Promise<any> {
+    const response = await apiClient.post(`${this.baseUrl}/${documentId}/workflows/review`, {
+      reviewer_id: reviewerId,
+      due_date: dueDate,
+      workflow_type: 'review'
+    })
+    return response.data
+  }
+
+  // Submit review
+  async submitReview(workflowId: number, approved: boolean, comments: string): Promise<any> {
+    const response = await apiClient.post(`${this.baseUrl}/workflows/${workflowId}/submit-review`, {
+      approved,
+      comments,
+      action: approved ? 'approve_review' : 'reject_review'
+    })
+    return response.data
+  }
+
+  // Start approval workflow
+  async startApprovalWorkflow(documentId: number, approverId: number, dueDate?: string): Promise<any> {
+    const response = await apiClient.post(`${this.baseUrl}/${documentId}/workflows/approval`, {
+      approver_id: approverId,
+      due_date: dueDate,
+      workflow_type: 'approval'
+    })
+    return response.data
+  }
+
+  // Submit approval
+  async submitApproval(workflowId: number, approved: boolean, comments: string, effectiveDate?: string): Promise<any> {
+    const response = await apiClient.post(`${this.baseUrl}/workflows/${workflowId}/submit-approval`, {
+      approved,
+      comments,
+      effective_date: effectiveDate,
+      action: approved ? 'approve_document' : 'reject_document'
+    })
+    return response.data
+  }
+
+  // Get document workflows
+  async getDocumentWorkflows(documentId: number): Promise<any[]> {
+    const response = await apiClient.get(`${this.baseUrl}/${documentId}/workflows`)
+    return response.data
+  }
+
+  // Get my pending workflows
+  async getMyPendingWorkflows(): Promise<any[]> {
+    const response = await apiClient.get(`${this.baseUrl}/workflows/my-pending`)
+    return response.data
+  }
+
+  // Update document status
+  async updateDocumentStatus(documentId: number, status: string, reason?: string): Promise<Document> {
+    const response = await apiClient.patch(`${this.baseUrl}/${documentId}/status`, {
+      status,
+      reason
+    })
+    return response.data
+  }
+
   // Error handling helper
   handleError(error: any): string {
     if (error.response?.data?.detail) {

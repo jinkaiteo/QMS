@@ -174,8 +174,9 @@ Phase 2 has been completed and includes:
 - **Metadata**: Keywords, tags, confidentiality levels, retention periods
 
 #### Workflow Engine
-- **Review Workflows**: Multi-step document review processes
+- **Review Workflows**: Multi-step document review processes with mandatory file upload validation
 - **Approval Workflows**: Document approval with digital signatures
+- **File Upload Requirements**: Documents must have attached files before entering review workflow
 - **Workflow Templates**: Predefined workflows for different document types
 - **Due Dates & Notifications**: Workflow tracking with automated reminders
 

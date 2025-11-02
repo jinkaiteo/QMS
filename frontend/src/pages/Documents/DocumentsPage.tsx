@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react'
-import { Box, Typography, Button, Paper, Grid, Chip, CircularProgress, Alert } from '@mui/material'
-import { Add, Description, Refresh } from '@mui/icons-material'
+import { Box, Typography, Button, Paper, Grid, Chip, CircularProgress, Alert, IconButton } from '@mui/material'
+import { Add, Description, Refresh, Visibility, Send, CheckCircle, Edit } from '@mui/icons-material'
 import { useDispatch } from 'react-redux'
 import { setPageTitle, setBreadcrumbs } from '@store/slices/uiSlice'
 import { documentsService, Document, DocumentSearchResponse } from '../../services/documentsService'
+import DocumentDetailModal from '../../components/Documents/DocumentDetailModal'
+import CreateDocumentModal from '../../components/Documents/CreateDocumentModal'
 
 const DocumentsPage: React.FC = () => {
   const dispatch = useDispatch()
@@ -12,11 +14,16 @@ const DocumentsPage: React.FC = () => {
     total: 0,
     approved: 0,
     pending_review: 0,
+    reviewed: 0,
+    pending_approval: 0,
     draft: 0,
-    expired: 0
+    obsolete: 0
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
 
   useEffect(() => {
     dispatch(setPageTitle('Document Management'))
@@ -58,6 +65,15 @@ const DocumentsPage: React.FC = () => {
     loadStats()
   }
 
+  const handleCreateDocument = () => {
+    setCreateModalOpen(true)
+  }
+
+  const handleImportDocuments = () => {
+    // TODO: Implement import documents functionality  
+    alert('Import Documents functionality coming in Phase 2!')
+  }
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'approved': return 'success'
@@ -83,6 +99,103 @@ const DocumentsPage: React.FC = () => {
     return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
   }
 
+  const handleDocumentClick = (document: Document) => {
+    setSelectedDocument(document)
+    setModalOpen(true)
+  }
+
+  const handleCloseModal = () => {
+    setModalOpen(false)
+    setSelectedDocument(null)
+  }
+
+  const handleCreateModalClose = () => {
+    setCreateModalOpen(false)
+  }
+
+  const handleDocumentCreated = () => {
+    loadDocuments()
+    loadStats()
+  }
+
+  const getActionButtons = (document: Document) => {
+    const buttons = []
+    
+    // View button (always available)
+    buttons.push(
+      <Button
+        key="view"
+        size="small"
+        variant="outlined"
+        startIcon={<Visibility />}
+        onClick={() => handleDocumentClick(document)}
+      >
+        View
+      </Button>
+    )
+
+    // Status-based action buttons
+    switch (document.status.toLowerCase()) {
+      case 'draft':
+        buttons.push(
+          <Button
+            key="edit"
+            size="small"
+            variant="outlined"
+            startIcon={<Edit />}
+            onClick={() => handleDocumentClick(document)}
+          >
+            Edit
+          </Button>
+        )
+        buttons.push(
+          <Button
+            key="review"
+            size="small"
+            variant="contained"
+            startIcon={<Send />}
+            onClick={() => handleDocumentClick(document)}
+          >
+            Start Review
+          </Button>
+        )
+        break
+      
+      case 'pending_review':
+      case 'under_review':
+        buttons.push(
+          <Button
+            key="review"
+            size="small"
+            variant="contained"
+            color="info"
+            startIcon={<CheckCircle />}
+            onClick={() => handleDocumentClick(document)}
+          >
+            Review
+          </Button>
+        )
+        break
+      
+      case 'pending_approval':
+        buttons.push(
+          <Button
+            key="approve"
+            size="small"
+            variant="contained"
+            color="success"
+            startIcon={<CheckCircle />}
+            onClick={() => handleDocumentClick(document)}
+          >
+            Approve
+          </Button>
+        )
+        break
+    }
+
+    return buttons
+  }
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -98,10 +211,18 @@ const DocumentsPage: React.FC = () => {
           >
             Refresh
           </Button>
-          <Button variant="outlined" startIcon={<Description />}>
+          <Button 
+            variant="outlined" 
+            startIcon={<Description />}
+            onClick={handleImportDocuments}
+          >
             Import Documents
           </Button>
-          <Button variant="contained" startIcon={<Add />}>
+          <Button 
+            variant="contained" 
+            startIcon={<Add />}
+            onClick={handleCreateDocument}
+          >
             Create Document
           </Button>
         </Box>
@@ -129,8 +250,8 @@ const DocumentsPage: React.FC = () => {
         </Grid>
         <Grid item xs={12} sm={3}>
           <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'error.main', color: 'white' }}>
-            <Typography variant="h4" sx={{ fontWeight: 600 }}>{stats.draft + stats.expired}</Typography>
-            <Typography variant="body2">Draft/Expired</Typography>
+            <Typography variant="h4" sx={{ fontWeight: 600 }}>{(stats.draft || 0) + (stats.obsolete || 0)}</Typography>
+            <Typography variant="body2">Draft/Obsolete</Typography>
           </Paper>
         </Grid>
       </Grid>
@@ -169,29 +290,29 @@ const DocumentsPage: React.FC = () => {
                   display: 'flex', 
                   justifyContent: 'space-between', 
                   alignItems: 'center',
-                  '&:hover': { bgcolor: 'action.hover', cursor: 'pointer' }
+                  '&:hover': { bgcolor: 'action.hover' }
                 }}
               >
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                <Box sx={{ flex: 1, cursor: 'pointer' }} onClick={() => handleDocumentClick(doc)}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}>
                     {doc.title}
                   </Typography>
                   <Typography variant="body2" color="textSecondary">
-                    {doc.document_number} • {doc.document_type.name} • Version {doc.current_version} • Modified: {formatDate(doc.updated_at)}
+                    {doc.document_number} • {doc.document_type.name} • Version {doc.current_version || '1.0'} • Modified: {formatDate(doc.updated_at)}
                   </Typography>
                   <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
                     Author: {doc.author.full_name} • Created: {formatDate(doc.created_at)}
                   </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                   <Chip 
                     label={formatStatus(doc.status)} 
                     color={getStatusColor(doc.status) as any}
                     size="small"
                   />
-                  <Button size="small" variant="outlined">
-                    View
-                  </Button>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {getActionButtons(doc)}
+                  </Box>
                 </Box>
               </Paper>
             ))}
@@ -199,11 +320,36 @@ const DocumentsPage: React.FC = () => {
         )}
         
         <Box sx={{ mt: 3, textAlign: 'center' }}>
-          <Button variant="outlined" sx={{ minWidth: 200 }}>
+          <Button 
+            variant="outlined" 
+            sx={{ minWidth: 200 }}
+            onClick={() => {
+              // TODO: Implement pagination or full document list view
+              alert('Full document list view coming in Phase 2!')
+            }}
+          >
             View All Documents ({stats.total} total)
           </Button>
         </Box>
       </Paper>
+
+      {/* Document Detail Modal */}
+      <DocumentDetailModal
+        document={selectedDocument}
+        open={modalOpen}
+        onClose={handleCloseModal}
+        currentUser={{ 
+          id: 1, 
+          permissions: ['read', 'write', 'review', 'approve'] // TODO: Get from actual user context
+        }}
+      />
+
+      {/* Create Document Modal */}
+      <CreateDocumentModal
+        open={createModalOpen}
+        onClose={handleCreateModalClose}
+        onDocumentCreated={handleDocumentCreated}
+      />
     </Box>
   )
 }

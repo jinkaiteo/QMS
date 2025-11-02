@@ -3,7 +3,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, users, system, training_simple, documents
+from app.api.v1.endpoints import auth, users, system, training_simple, documents, document_workflows, document_files, document_roles
 # Temporarily disabled problematic modules: quality_events, capas, lims, user_profiles, business_calendar, predictive_scheduling, advanced_analytics, compliance_automation, notification_system, document_upload, document_workflow, document_version
 # department_hierarchy temporarily disabled due to model conflicts
 
@@ -50,6 +50,33 @@ except Exception as e:
     import traceback
     logger.error(f"Full traceback: {traceback.format_exc()}")
     print(f"Full traceback: {traceback.format_exc()}")
+
+# DOCUMENT WORKFLOWS ROUTER - PHASE 2 WORKFLOW SYSTEM
+try:
+    api_router.include_router(document_workflows.router, prefix="/documents/workflows", tags=["document-workflows"])
+    logger.info("✅ Document workflows router added successfully")
+    print("✅ Document workflows router added successfully!")
+except Exception as e:
+    logger.error(f"Error adding document workflows router: {e}")
+    print(f"Error adding document workflows router: {e}")
+
+# DOCUMENT FILES ROUTER - PHASE 2 FILE MANAGEMENT
+try:
+    api_router.include_router(document_files.router, prefix="/documents/files", tags=["document-files"])
+    logger.info("✅ Document files router added successfully")
+    print("✅ Document files router added successfully!")
+except Exception as e:
+    logger.error(f"Error adding document files router: {e}")
+    print(f"Error adding document files router: {e}")
+
+# DOCUMENT ROLES ROUTER - PHASE 2 RBAC SYSTEM
+try:
+    api_router.include_router(document_roles.router, prefix="/documents/roles", tags=["document-roles"])
+    logger.info("✅ Document roles router added successfully")
+    print("✅ Document roles router added successfully!")
+except Exception as e:
+    logger.error(f"Error adding document roles router: {e}")
+    print(f"Error adding document roles router: {e}")
 
 # Temporarily disabled all other endpoints due to Pydantic v2 compatibility issues
 # api_router.include_router(user_profiles.router, prefix="/user-profiles", tags=["user-profiles"])

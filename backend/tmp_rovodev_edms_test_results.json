@@ -1,0 +1,44 @@
+[
+  {
+    "test": "System Health Check",
+    "success": true,
+    "details": "Status: 200",
+    "timestamp": "2025-11-02T15:21:16.361671"
+  },
+  {
+    "test": "Frontend Accessibility",
+    "success": true,
+    "details": "Status: 200",
+    "timestamp": "2025-11-02T15:21:16.394206"
+  },
+  {
+    "test": "Authentication",
+    "success": false,
+    "details": "Status: 500",
+    "timestamp": "2025-11-02T15:21:16.400696"
+  },
+  {
+    "test": "Document List Endpoint",
+    "success": false,
+    "details": "Status: 403",
+    "timestamp": "2025-11-02T15:21:16.404616"
+  },
+  {
+    "test": "Document Categories Endpoint",
+    "success": false,
+    "details": "Status: 403",
+    "timestamp": "2025-11-02T15:21:16.408684"
+  },
+  {
+    "test": "Workflow Endpoints",
+    "success": false,
+    "details": "Status: 403",
+    "timestamp": "2025-11-02T15:21:16.415426"
+  },
+  {
+    "test": "File Upload Endpoints",
+    "success": false,
+    "details": "Status: 404",
+    "timestamp": "2025-11-02T15:21:16.418804"
+  }
+]

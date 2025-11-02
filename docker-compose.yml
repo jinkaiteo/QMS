@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:18
+    container_name: scientific-protocol-db
+    environment:
+      POSTGRES_DB: scientific_protocols
+      POSTGRES_USER: protocol_user
+      POSTGRES_PASSWORD: protocol_pass
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - protocol-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U protocol_user -d scientific_protocols"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: scientific-protocol-redis
+    command: redis-server --requirepass redis_pass
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - protocol-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./scientific-protocol-builder/backend
+      dockerfile: Dockerfile
+    container_name: scientific-protocol-backend
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: scientific_protocols
+      DB_USER: protocol_user
+      DB_PASSWORD: protocol_pass
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_pass
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      CORS_ORIGIN: http://localhost:3000
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./scientific-protocol-builder/backend:/app
+      - /app/node_modules
+    networks:
+      - protocol-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend PWA
+  frontend:
+    build:
+      context: ./scientific-protocol-builder/frontend
+      dockerfile: Dockerfile
+    container_name: scientific-protocol-frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:3001/api
+      VITE_WS_URL: ws://localhost:3001
+      VITE_APP_NAME: Scientific Protocol Builder
+      VITE_APP_VERSION: 2.0.0
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./scientific-protocol-builder/frontend:/app
+      - /app/node_modules
+    networks:
+      - protocol-network
+    restart: unless-stopped
+
+  # MinIO Object Storage (for file uploads)
+  minio:
+    image: minio/minio:latest
+    container_name: scientific-protocol-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio_admin
+      MINIO_ROOT_PASSWORD: minio_password
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - protocol-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+
+networks:
+  protocol-network:
+    driver: bridge

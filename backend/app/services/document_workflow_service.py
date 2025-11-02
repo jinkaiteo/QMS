@@ -1,455 +1,472 @@
 """
 Document Workflow Service
-Manages pharmaceutical document approval workflows
+Handles document review, approval, and lifecycle workflows
 """
-
-from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import text
 
-from app.models.user import User
-from app.models.edms import Document, DocumentType
-from app.models.document_workflow import (
-    DocumentWorkflowTemplate, WorkflowStepTemplate, DocumentWorkflowInstance,
-    DocumentWorkflowStep, DocumentSignature, DocumentComment, DocumentNotification,
-    WorkflowStatus, ApprovalAction, SignatureType
-)
-from app.services.notification_service import notification_service
+from app.core.logging import get_logger
 
+logger = get_logger(__name__)
 
 class DocumentWorkflowService:
-    """Service for managing document workflows"""
+    """Service for managing document workflows and approvals"""
     
-    def __init__(self, db: Session, current_user: User):
+    def __init__(self, db: Session):
         self.db = db
-        self.current_user = current_user
-    
-    def initiate_workflow(
+        
+    def start_review_workflow(
         self, 
         document_id: int, 
-        template_id: Optional[int] = None,
-        custom_reviewers: Optional[List[int]] = None,
-        custom_approvers: Optional[List[int]] = None,
-        due_date: Optional[datetime] = None
-    ) -> DocumentWorkflowInstance:
-        """Initiate a workflow for a document"""
-        
-        # Get document
-        document = self.db.query(Document).filter(Document.id == document_id).first()
-        if not document:
-            raise ValueError("Document not found")
-        
-        # Get or create workflow template
-        if template_id:
-            template = self.db.query(DocumentWorkflowTemplate).filter(
-                DocumentWorkflowTemplate.id == template_id
-            ).first()
-        else:
-            # Use default template for document type
-            template = self.db.query(DocumentWorkflowTemplate).filter(
-                DocumentWorkflowTemplate.document_type_id == document.document_type_id,
-                DocumentWorkflowTemplate.is_active == True
-            ).first()
-        
-        if not template:
-            # Create basic workflow if no template exists
-            return self._create_basic_workflow(document_id, due_date)
-        
-        # Calculate due date if not provided
-        if not due_date:
-            total_days = template.review_days + template.approval_days
-            due_date = datetime.utcnow() + timedelta(days=total_days)
-        
-        # Create workflow instance
-        workflow_instance = DocumentWorkflowInstance(
-            document_id=document_id,
-            template_id=template.id,
-            workflow_name=f"{template.name} - {document.title}",
-            initiated_by_id=self.current_user.id,
-            due_date=due_date,
-            status=WorkflowStatus.IN_PROGRESS
-        )
-        
-        self.db.add(workflow_instance)
-        self.db.flush()  # Get the ID
-        
-        # Create workflow steps
-        step_templates = self.db.query(WorkflowStepTemplate).filter(
-            WorkflowStepTemplate.template_id == template.id
-        ).order_by(WorkflowStepTemplate.step_order).all()
-        
-        for step_template in step_templates:
-            # Determine assignee
-            assignee_id = self._determine_step_assignee(
-                step_template, 
-                document, 
-                custom_reviewers if step_template.step_type == "review" else custom_approvers
-            )
+        reviewer_id: int, 
+        user_id: int,
+        due_days: int = 7,
+        reason: str = "Initial review"
+    ) -> Dict[str, Any]:
+        """Start a review workflow for a document"""
+        try:
+            # Create workflow record
+            workflow_query = text("""
+                INSERT INTO document_workflows 
+                (document_id, workflow_type, status, initiated_by_id, current_step, reason, created_at, updated_at)
+                VALUES (:document_id, 'review', 'pending_review', :initiated_by_id, 'review', :reason, NOW(), NOW())
+                RETURNING id
+            """)
             
-            step_due_date = datetime.utcnow() + timedelta(days=step_template.days_to_complete)
+            result = self.db.execute(workflow_query, {
+                'document_id': document_id,
+                'initiated_by_id': user_id,
+                'reason': reason
+            })
+            workflow_id = result.fetchone()[0]
             
-            workflow_step = DocumentWorkflowStep(
-                workflow_instance_id=workflow_instance.id,
-                step_order=step_template.step_order,
-                step_name=step_template.step_name,
-                step_type=step_template.step_type,
-                assigned_to_id=assignee_id,
-                assigned_by_id=self.current_user.id,
-                assigned_at=datetime.utcnow() if step_template.step_order == 1 else None,
-                due_date=step_due_date,
-                status=WorkflowStatus.PENDING if step_template.step_order == 1 else WorkflowStatus.PENDING
-            )
+            # Create review step
+            step_query = text("""
+                INSERT INTO workflow_steps 
+                (workflow_id, step_type, step_order, assigned_to_id, status, due_date, created_at, updated_at)
+                VALUES (:workflow_id, 'review', 1, :assigned_to_id, 'pending', :due_date, NOW(), NOW())
+                RETURNING id
+            """)
             
-            self.db.add(workflow_step)
-        
-        self.db.commit()
-        self.db.refresh(workflow_instance)
-        
-        # Send initial notifications
-        self._send_workflow_notifications(workflow_instance, "initiated")
-        
-        return workflow_instance
-    
-    def complete_workflow_step(
-        self,
-        step_id: int,
-        action: ApprovalAction,
-        comments: Optional[str] = None,
-        signature_data: Optional[Dict[str, Any]] = None
-    ) -> bool:
-        """Complete a workflow step"""
-        
-        step = self.db.query(DocumentWorkflowStep).filter(
-            DocumentWorkflowStep.id == step_id
-        ).first()
-        
-        if not step:
-            raise ValueError("Workflow step not found")
-        
-        # Verify user can complete this step
-        if step.assigned_to_id != self.current_user.id:
-            raise ValueError("User not authorized to complete this step")
-        
-        if step.status == WorkflowStatus.COMPLETED:
-            raise ValueError("Step already completed")
-        
-        # Update step
-        step.completed_by_id = self.current_user.id
-        step.completed_at = datetime.utcnow()
-        step.status = WorkflowStatus.COMPLETED
-        step.action_taken = action
-        step.comments = comments
-        
-        # Create electronic signature if provided
-        if signature_data:
-            signature = self._create_electronic_signature(step, signature_data)
-            self.db.add(signature)
-        
-        # Determine next steps based on action
-        if action == ApprovalAction.APPROVE:
-            self._advance_workflow(step.workflow_instance_id)
-        elif action == ApprovalAction.REJECT:
-            self._reject_workflow(step.workflow_instance_id, comments)
-        elif action == ApprovalAction.RETURN_FOR_REVISION:
-            self._return_for_revision(step.workflow_instance_id, comments)
-        
-        self.db.commit()
-        
-        # Send notifications
-        self._send_step_completion_notifications(step, action)
-        
-        return True
-    
-    def add_comment(
-        self,
-        document_id: int,
-        comment_text: str,
-        comment_type: str = "general",
-        workflow_step_id: Optional[int] = None,
-        page_number: Optional[int] = None,
-        section_reference: Optional[str] = None
-    ) -> DocumentComment:
-        """Add a comment to a document"""
-        
-        comment = DocumentComment(
-            document_id=document_id,
-            workflow_step_id=workflow_step_id,
-            comment_text=comment_text,
-            comment_type=comment_type,
-            page_number=page_number,
-            section_reference=section_reference,
-            created_by_id=self.current_user.id
-        )
-        
-        self.db.add(comment)
-        self.db.commit()
-        
-        # Notify relevant users
-        self._send_comment_notifications(comment)
-        
-        return comment
-    
-    def get_user_tasks(
-        self,
-        user_id: Optional[int] = None,
-        status: Optional[WorkflowStatus] = None,
-        overdue_only: bool = False
-    ) -> List[DocumentWorkflowStep]:
-        """Get workflow tasks for a user"""
-        
-        target_user_id = user_id or self.current_user.id
-        
-        query = self.db.query(DocumentWorkflowStep).filter(
-            DocumentWorkflowStep.assigned_to_id == target_user_id
-        )
-        
-        if status:
-            query = query.filter(DocumentWorkflowStep.status == status)
-        else:
-            query = query.filter(DocumentWorkflowStep.status.in_([
-                WorkflowStatus.PENDING, WorkflowStatus.IN_PROGRESS
-            ]))
-        
-        if overdue_only:
-            query = query.filter(
-                DocumentWorkflowStep.due_date < datetime.utcnow()
-            )
-        
-        return query.order_by(DocumentWorkflowStep.due_date.asc()).all()
-    
-    def get_workflow_status(self, document_id: int) -> Dict[str, Any]:
-        """Get workflow status for a document"""
-        
-        workflow = self.db.query(DocumentWorkflowInstance).filter(
-            DocumentWorkflowInstance.document_id == document_id
-        ).first()
-        
-        if not workflow:
-            return {"status": "no_workflow", "steps": []}
-        
-        steps = self.db.query(DocumentWorkflowStep).filter(
-            DocumentWorkflowStep.workflow_instance_id == workflow.id
-        ).order_by(DocumentWorkflowStep.step_order).all()
-        
-        step_data = []
-        for step in steps:
-            step_info = {
-                "id": step.id,
-                "step_name": step.step_name,
-                "step_type": step.step_type,
-                "status": step.status,
-                "assigned_to": step.assigned_to.username if step.assigned_to else None,
-                "due_date": step.due_date,
-                "completed_at": step.completed_at,
-                "completed_by": step.completed_by.username if step.completed_by else None,
-                "action_taken": step.action_taken,
-                "comments": step.comments
+            due_date = datetime.now() + timedelta(days=due_days)
+            result = self.db.execute(step_query, {
+                'workflow_id': workflow_id,
+                'assigned_to_id': reviewer_id,
+                'due_date': due_date
+            })
+            review_step_id = result.fetchone()[0]
+            
+            # Update document status
+            doc_query = text("""
+                UPDATE documents 
+                SET status = 'pending_review', workflow_id = :workflow_id, updated_at = NOW()
+                WHERE id = :document_id
+            """)
+            
+            self.db.execute(doc_query, {
+                'workflow_id': workflow_id,
+                'document_id': document_id
+            })
+            
+            self.db.commit()
+            
+            logger.info(f"Review workflow started for document {document_id} by user {user_id}")
+            
+            return {
+                'workflow_id': workflow_id,
+                'review_step_id': review_step_id,
+                'status': 'pending_review',
+                'reviewer_id': reviewer_id,
+                'due_date': due_date
             }
-            step_data.append(step_info)
-        
-        return {
-            "workflow_id": workflow.id,
-            "status": workflow.status,
-            "current_step": workflow.current_step,
-            "initiated_by": workflow.initiator.username,
-            "initiated_at": workflow.initiated_at,
-            "due_date": workflow.due_date,
-            "steps": step_data
-        }
+            
+        except Exception as e:
+            logger.error(f"Error starting review workflow: {str(e)}")
+            self.db.rollback()
+            raise
     
-    def delegate_task(
-        self,
-        step_id: int,
-        delegate_to_id: int,
-        reason: str
-    ) -> bool:
-        """Delegate a workflow task to another user"""
-        
-        step = self.db.query(DocumentWorkflowStep).filter(
-            DocumentWorkflowStep.id == step_id
-        ).first()
-        
-        if not step:
-            raise ValueError("Workflow step not found")
-        
-        if step.assigned_to_id != self.current_user.id:
-            raise ValueError("User not authorized to delegate this step")
-        
-        # Update step assignment
-        step.delegated_to_id = step.assigned_to_id
-        step.assigned_to_id = delegate_to_id
-        step.delegation_reason = reason
-        
-        self.db.commit()
-        
-        # Send delegation notification
-        self._send_delegation_notification(step)
-        
-        return True
+    def submit_review(
+        self, 
+        workflow_step_id: int, 
+        approved: bool, 
+        comments: str, 
+        user_id: int
+    ) -> Dict[str, Any]:
+        """Submit a review decision"""
+        try:
+            # Update workflow step
+            step_query = text("""
+                UPDATE workflow_steps 
+                SET status = 'completed', 
+                    decision = :decision, 
+                    comments = :comments, 
+                    completed_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = :step_id
+            """)
+            
+            self.db.execute(step_query, {
+                'step_id': workflow_step_id,
+                'decision': 'approved' if approved else 'rejected',
+                'comments': comments
+            })
+            
+            # Get workflow and document info
+            info_query = text("""
+                SELECT ws.workflow_id, dw.document_id
+                FROM workflow_steps ws
+                JOIN document_workflows dw ON ws.workflow_id = dw.id
+                WHERE ws.id = :step_id
+            """)
+            
+            result = self.db.execute(info_query, {'step_id': workflow_step_id})
+            row = result.fetchone()
+            workflow_id, document_id = row[0], row[1]
+            
+            if approved:
+                # Move to approval stage
+                workflow_query = text("""
+                    UPDATE document_workflows 
+                    SET status = 'pending_approval', current_step = 'approval', updated_at = NOW()
+                    WHERE id = :workflow_id
+                """)
+                
+                doc_query = text("""
+                    UPDATE documents 
+                    SET status = 'pending_approval', updated_at = NOW()
+                    WHERE id = :document_id
+                """)
+                
+                # Create approval step
+                approval_query = text("""
+                    INSERT INTO workflow_steps 
+                    (workflow_id, step_type, step_order, assigned_to_id, status, due_date, created_at, updated_at)
+                    VALUES (:workflow_id, 'approve', 2, :assigned_to_id, 'pending', :due_date, NOW(), NOW())
+                """)
+                
+                self.db.execute(workflow_query, {'workflow_id': workflow_id})
+                self.db.execute(doc_query, {'document_id': document_id})
+                self.db.execute(approval_query, {
+                    'workflow_id': workflow_id,
+                    'assigned_to_id': user_id,  # Default to reviewer, should be configurable
+                    'due_date': datetime.now() + timedelta(days=5)
+                })
+                
+                status = 'approved_for_approval'
+            else:
+                # Reject - return to draft
+                workflow_query = text("""
+                    UPDATE document_workflows 
+                    SET status = 'rejected', current_step = 'review', updated_at = NOW()
+                    WHERE id = :workflow_id
+                """)
+                
+                doc_query = text("""
+                    UPDATE documents 
+                    SET status = 'draft', updated_at = NOW()
+                    WHERE id = :document_id
+                """)
+                
+                self.db.execute(workflow_query, {'workflow_id': workflow_id})
+                self.db.execute(doc_query, {'document_id': document_id})
+                
+                status = 'rejected'
+            
+            # Add comment
+            comment_query = text("""
+                INSERT INTO document_comments 
+                (document_id, workflow_step_id, comment_text, comment_type, author_id, created_at, updated_at)
+                VALUES (:document_id, :workflow_step_id, :comment_text, 'review', :author_id, NOW(), NOW())
+            """)
+            
+            self.db.execute(comment_query, {
+                'document_id': document_id,
+                'workflow_step_id': workflow_step_id,
+                'comment_text': comments,
+                'author_id': user_id
+            })
+            
+            self.db.commit()
+            
+            logger.info(f"Review submitted for workflow step {workflow_step_id}: {status}")
+            
+            return {
+                'status': status,
+                'workflow_id': workflow_id,
+                'document_id': document_id,
+                'approved': approved,
+                'comments': comments
+            }
+            
+        except Exception as e:
+            logger.error(f"Error submitting review: {str(e)}")
+            self.db.rollback()
+            raise
     
-    # Private helper methods
+    def submit_approval(
+        self, 
+        workflow_step_id: int, 
+        approved: bool, 
+        comments: str, 
+        user_id: int,
+        effective_date: Optional[datetime] = None
+    ) -> Dict[str, Any]:
+        """Submit a final approval decision"""
+        try:
+            # Update workflow step
+            step_query = text("""
+                UPDATE workflow_steps 
+                SET status = 'completed', 
+                    decision = :decision, 
+                    comments = :comments, 
+                    completed_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = :step_id
+            """)
+            
+            self.db.execute(step_query, {
+                'step_id': workflow_step_id,
+                'decision': 'approved' if approved else 'rejected',
+                'comments': comments
+            })
+            
+            # Get workflow and document info
+            info_query = text("""
+                SELECT ws.workflow_id, dw.document_id
+                FROM workflow_steps ws
+                JOIN document_workflows dw ON ws.workflow_id = dw.id
+                WHERE ws.id = :step_id
+            """)
+            
+            result = self.db.execute(info_query, {'step_id': workflow_step_id})
+            row = result.fetchone()
+            workflow_id, document_id = row[0], row[1]
+            
+            if approved:
+                # Document approved - set effective
+                eff_date = effective_date or datetime.now().date()
+                
+                workflow_query = text("""
+                    UPDATE document_workflows 
+                    SET status = 'approved', current_step = 'completed', completed_at = NOW(), updated_at = NOW()
+                    WHERE id = :workflow_id
+                """)
+                
+                doc_query = text("""
+                    UPDATE documents 
+                    SET status = 'approved', effective_date = :effective_date, updated_at = NOW()
+                    WHERE id = :document_id
+                """)
+                
+                self.db.execute(workflow_query, {'workflow_id': workflow_id})
+                self.db.execute(doc_query, {
+                    'document_id': document_id,
+                    'effective_date': eff_date
+                })
+                
+                status = 'approved'
+            else:
+                # Reject - return to draft
+                workflow_query = text("""
+                    UPDATE document_workflows 
+                    SET status = 'rejected', current_step = 'approval', updated_at = NOW()
+                    WHERE id = :workflow_id
+                """)
+                
+                doc_query = text("""
+                    UPDATE documents 
+                    SET status = 'draft', updated_at = NOW()
+                    WHERE id = :document_id
+                """)
+                
+                self.db.execute(workflow_query, {'workflow_id': workflow_id})
+                self.db.execute(doc_query, {'document_id': document_id})
+                
+                status = 'rejected'
+                eff_date = None
+            
+            # Add comment
+            comment_query = text("""
+                INSERT INTO document_comments 
+                (document_id, workflow_step_id, comment_text, comment_type, author_id, created_at, updated_at)
+                VALUES (:document_id, :workflow_step_id, :comment_text, 'approval', :author_id, NOW(), NOW())
+            """)
+            
+            self.db.execute(comment_query, {
+                'document_id': document_id,
+                'workflow_step_id': workflow_step_id,
+                'comment_text': comments,
+                'author_id': user_id
+            })
+            
+            self.db.commit()
+            
+            logger.info(f"Approval submitted for workflow step {workflow_step_id}: {status}")
+            
+            return {
+                'status': status,
+                'workflow_id': workflow_id,
+                'document_id': document_id,
+                'approved': approved,
+                'effective_date': eff_date,
+                'comments': comments
+            }
+            
+        except Exception as e:
+            logger.error(f"Error submitting approval: {str(e)}")
+            self.db.rollback()
+            raise
     
-    def _create_basic_workflow(self, document_id: int, due_date: Optional[datetime]) -> DocumentWorkflowInstance:
-        """Create a basic workflow when no template exists"""
-        
-        if not due_date:
-            due_date = datetime.utcnow() + timedelta(days=7)
-        
-        workflow_instance = DocumentWorkflowInstance(
-            document_id=document_id,
-            workflow_name="Basic Document Review",
-            initiated_by_id=self.current_user.id,
-            due_date=due_date,
-            status=WorkflowStatus.IN_PROGRESS
-        )
-        
-        self.db.add(workflow_instance)
-        self.db.flush()
-        
-        # Create a simple review step
-        review_step = DocumentWorkflowStep(
-            workflow_instance_id=workflow_instance.id,
-            step_order=1,
-            step_name="Document Review",
-            step_type="review",
-            assigned_to_id=self.current_user.id,  # Assign to initiator for now
-            assigned_by_id=self.current_user.id,
-            assigned_at=datetime.utcnow(),
-            due_date=due_date,
-            status=WorkflowStatus.PENDING
-        )
-        
-        self.db.add(review_step)
-        return workflow_instance
+    def get_user_pending_actions(self, user_id: int) -> List[Dict[str, Any]]:
+        """Get pending workflow actions for a user"""
+        try:
+            query = text("""
+                SELECT 
+                    ws.id as step_id,
+                    ws.workflow_id,
+                    ws.step_type,
+                    ws.due_date,
+                    d.id as document_id,
+                    d.document_number,
+                    d.title,
+                    dw.workflow_type,
+                    dw.reason
+                FROM workflow_steps ws
+                JOIN document_workflows dw ON ws.workflow_id = dw.id
+                JOIN documents d ON dw.document_id = d.id
+                WHERE ws.assigned_to_id = :user_id
+                  AND ws.status = 'pending'
+                  AND d.is_deleted = FALSE
+                  AND dw.is_deleted = FALSE
+                  AND ws.is_deleted = FALSE
+                ORDER BY ws.due_date ASC
+            """)
+            
+            result = self.db.execute(query, {'user_id': user_id})
+            actions = []
+            
+            for row in result.fetchall():
+                actions.append({
+                    'step_id': row.step_id,
+                    'workflow_id': row.workflow_id,
+                    'step_type': row.step_type,
+                    'due_date': row.due_date,
+                    'document_id': row.document_id,
+                    'document_number': row.document_number,
+                    'title': row.title,
+                    'workflow_type': row.workflow_type,
+                    'reason': row.reason,
+                    'is_overdue': row.due_date < datetime.now() if row.due_date else False
+                })
+            
+            return actions
+            
+        except Exception as e:
+            logger.error(f"Error getting pending actions for user {user_id}: {str(e)}")
+            return []
     
-    def _determine_step_assignee(
-        self,
-        step_template: WorkflowStepTemplate,
-        document: Document,
-        custom_assignees: Optional[List[int]]
-    ) -> Optional[int]:
-        """Determine who should be assigned to a workflow step"""
-        
-        if custom_assignees and len(custom_assignees) > 0:
-            return custom_assignees[0]  # Use first custom assignee
-        
-        if step_template.user_id:
-            return step_template.user_id
-        
-        # Add logic here for role-based or department-based assignment
-        # For now, assign to the document creator
-        return document.created_by_id
+    def get_document_workflow_history(self, document_id: int) -> List[Dict[str, Any]]:
+        """Get workflow history for a document"""
+        try:
+            query = text("""
+                SELECT 
+                    dw.id as workflow_id,
+                    dw.workflow_type,
+                    dw.status as workflow_status,
+                    dw.created_at as started_at,
+                    dw.completed_at,
+                    dw.reason,
+                    u1.username as initiated_by,
+                    ws.id as step_id,
+                    ws.step_type,
+                    ws.status as step_status,
+                    ws.decision,
+                    ws.comments,
+                    ws.completed_at as step_completed_at,
+                    u2.username as assigned_to
+                FROM document_workflows dw
+                JOIN users u1 ON dw.initiated_by_id = u1.id
+                LEFT JOIN workflow_steps ws ON dw.id = ws.workflow_id
+                LEFT JOIN users u2 ON ws.assigned_to_id = u2.id
+                WHERE dw.document_id = :document_id
+                  AND dw.is_deleted = FALSE
+                ORDER BY dw.created_at DESC, ws.step_order ASC
+            """)
+            
+            result = self.db.execute(query, {'document_id': document_id})
+            history = []
+            
+            for row in result.fetchall():
+                history.append({
+                    'workflow_id': row.workflow_id,
+                    'workflow_type': row.workflow_type,
+                    'workflow_status': row.workflow_status,
+                    'started_at': row.started_at,
+                    'completed_at': row.completed_at,
+                    'reason': row.reason,
+                    'initiated_by': row.initiated_by,
+                    'step_id': row.step_id,
+                    'step_type': row.step_type,
+                    'step_status': row.step_status,
+                    'decision': row.decision,
+                    'comments': row.comments,
+                    'step_completed_at': row.step_completed_at,
+                    'assigned_to': row.assigned_to
+                })
+            
+            return history
+            
+        except Exception as e:
+            logger.error(f"Error getting workflow history for document {document_id}: {str(e)}")
+            return []
     
-    def _advance_workflow(self, workflow_instance_id: int):
-        """Advance workflow to next step"""
-        
-        workflow = self.db.query(DocumentWorkflowInstance).filter(
-            DocumentWorkflowInstance.id == workflow_instance_id
-        ).first()
-        
-        # Find next pending step
-        next_step = self.db.query(DocumentWorkflowStep).filter(
-            DocumentWorkflowStep.workflow_instance_id == workflow_instance_id,
-            DocumentWorkflowStep.status == WorkflowStatus.PENDING,
-            DocumentWorkflowStep.step_order > workflow.current_step
-        ).order_by(DocumentWorkflowStep.step_order).first()
-        
-        if next_step:
-            # Activate next step
-            next_step.assigned_at = datetime.utcnow()
-            workflow.current_step = next_step.step_order
-        else:
-            # Workflow complete
-            workflow.status = WorkflowStatus.COMPLETED
-            workflow.completed_at = datetime.utcnow()
-    
-    def _reject_workflow(self, workflow_instance_id: int, reason: str):
-        """Reject the workflow"""
-        
-        workflow = self.db.query(DocumentWorkflowInstance).filter(
-            DocumentWorkflowInstance.id == workflow_instance_id
-        ).first()
-        
-        workflow.status = WorkflowStatus.REJECTED
-        workflow.completed_at = datetime.utcnow()
-        workflow.comments = reason
-    
-    def _return_for_revision(self, workflow_instance_id: int, reason: str):
-        """Return document for revision"""
-        
-        workflow = self.db.query(DocumentWorkflowInstance).filter(
-            DocumentWorkflowInstance.id == workflow_instance_id
-        ).first()
-        
-        # Reset workflow to beginning
-        workflow.current_step = 1
-        workflow.comments = reason
-        
-        # Reset all steps to pending
-        self.db.query(DocumentWorkflowStep).filter(
-            DocumentWorkflowStep.workflow_instance_id == workflow_instance_id
-        ).update({
-            "status": WorkflowStatus.PENDING,
-            "completed_at": None,
-            "completed_by_id": None,
-            "action_taken": None
-        })
-    
-    def _create_electronic_signature(
-        self,
-        step: DocumentWorkflowStep,
-        signature_data: Dict[str, Any]
-    ) -> DocumentSignature:
-        """Create an electronic signature"""
-        
-        import hashlib
-        import json
-        
-        # Create signature hash
-        signature_content = {
-            "user_id": self.current_user.id,
-            "document_id": step.workflow_instance.document_id,
-            "step_id": step.id,
-            "timestamp": datetime.utcnow().isoformat(),
-            "meaning": signature_data.get("meaning", "Approved"),
-            "method": signature_data.get("method", "password")
-        }
-        
-        signature_hash = hashlib.sha256(
-            json.dumps(signature_content, sort_keys=True).encode()
-        ).hexdigest()
-        
-        signature = DocumentSignature(
-            document_id=step.workflow_instance.document_id,
-            workflow_step_id=step.id,
-            signer_id=self.current_user.id,
-            signature_type=SignatureType.APPROVAL,
-            signature_meaning=signature_data.get("meaning", "Approved"),
-            signature_hash=signature_hash,
-            signature_method=signature_data.get("method", "password"),
-            ip_address=signature_data.get("ip_address"),
-            user_agent=signature_data.get("user_agent")
-        )
-        
-        return signature
-    
-    def _send_workflow_notifications(self, workflow: DocumentWorkflowInstance, event_type: str):
-        """Send notifications for workflow events"""
-        # Implementation would integrate with notification service
-        pass
-    
-    def _send_step_completion_notifications(self, step: DocumentWorkflowStep, action: ApprovalAction):
-        """Send notifications when a step is completed"""
-        # Implementation would notify relevant users
-        pass
-    
-    def _send_comment_notifications(self, comment: DocumentComment):
-        """Send notifications for new comments"""
-        # Implementation would notify document stakeholders
-        pass
-    
-    def _send_delegation_notification(self, step: DocumentWorkflowStep):
-        """Send notification for task delegation"""
-        # Implementation would notify the new assignee
-        pass
+    def get_workflow_statistics(self) -> Dict[str, Any]:
+        """Get workflow statistics for dashboard"""
+        try:
+            stats_query = text("""
+                SELECT 
+                    COUNT(*) as total_workflows,
+                    COUNT(CASE WHEN status = 'pending_review' THEN 1 END) as pending_review,
+                    COUNT(CASE WHEN status = 'pending_approval' THEN 1 END) as pending_approval,
+                    COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved,
+                    COUNT(CASE WHEN status = 'rejected' THEN 1 END) as rejected,
+                    COUNT(CASE WHEN workflow_type = 'review' THEN 1 END) as review_workflows,
+                    COUNT(CASE WHEN workflow_type = 'up_version' THEN 1 END) as up_version_workflows,
+                    COUNT(CASE WHEN workflow_type = 'obsolete' THEN 1 END) as obsolete_workflows
+                FROM document_workflows
+                WHERE is_deleted = FALSE
+            """)
+            
+            result = self.db.execute(stats_query)
+            row = result.fetchone()
+            
+            overdue_query = text("""
+                SELECT COUNT(*) as overdue_actions
+                FROM workflow_steps ws
+                JOIN document_workflows dw ON ws.workflow_id = dw.id
+                WHERE ws.status = 'pending'
+                  AND ws.due_date < NOW()
+                  AND ws.is_deleted = FALSE
+                  AND dw.is_deleted = FALSE
+            """)
+            
+            overdue_result = self.db.execute(overdue_query)
+            overdue_count = overdue_result.fetchone()[0]
+            
+            return {
+                'total_workflows': row.total_workflows,
+                'pending_review': row.pending_review,
+                'pending_approval': row.pending_approval,
+                'approved': row.approved,
+                'rejected': row.rejected,
+                'review_workflows': row.review_workflows,
+                'up_version_workflows': row.up_version_workflows,
+                'obsolete_workflows': row.obsolete_workflows,
+                'overdue_actions': overdue_count
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting workflow statistics: {str(e)}")
+            return {}

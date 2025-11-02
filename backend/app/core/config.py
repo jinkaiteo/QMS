@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     ]
     
     # File Storage
-    UPLOAD_PATH: str = "/app/uploads"
+    UPLOAD_PATH: str = "./uploads"
     MAX_FILE_SIZE: int = 100 * 1024 * 1024  # 100MB
     ALLOWED_EXTENSIONS: List[str] = [
         "pdf", "docx", "doc", "xlsx", "xls", 
@@ -93,7 +93,7 @@ class Settings(BaseSettings):
     MINIO_BUCKET_NAME: str = "qms-documents"
     
     # Document storage settings (Phase 2)
-    DOCUMENT_STORAGE_PATH: str = "/app/storage/documents"
+    DOCUMENT_STORAGE_PATH: str = "./storage/documents"
     MAX_DOCUMENT_SIZE_MB: int = 100
     ALLOWED_DOCUMENT_EXTENSIONS: list = [
         ".pdf", ".docx", ".doc", ".xlsx", ".xls", 
@@ -147,7 +147,7 @@ class Settings(BaseSettings):
     BACKUP_ENABLED: bool = True
     BACKUP_SCHEDULE: str = "0 2 * * *"  # Daily at 2 AM
     BACKUP_RETENTION_DAYS: int = 90
-    BACKUP_PATH: str = "/app/backups"
+    BACKUP_PATH: str = "./backups"
     
     class Config:
         # env_file = ".env"  # Temporarily disabled for container deployment
@@ -242,8 +242,11 @@ def ensure_directories():
     directories = [
         settings.UPLOAD_PATH,
         settings.BACKUP_PATH,
-        "/app/logs",
-        "/app/temp"
+        "./logs",
+        "./temp",
+        "./uploads", 
+        "./storage/documents",
+        "./backups"
     ]
     
     for directory in directories:
